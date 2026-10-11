@@ -24,6 +24,9 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase
  *   subsystems, ...).
  * - `Alerts/clearFaults`: set to `true` from a dashboard to call `clearFaults` (or equivalent) on
  *   every registered source. Automatically reset to `false` once handled.
+ *
+ * Note: these live at the NT root (`/Alerts/...`) via `getTable`, not under `/SmartDashboard`
+ * (where the `Dashboard*` tunables and `putData` buttons live). Read them from the same tree.
  */
 object Alerts : SubsystemBase() {
     enum class Level {

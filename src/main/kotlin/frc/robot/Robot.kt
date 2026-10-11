@@ -50,7 +50,7 @@ class Robot : TimedRobot() {
 
     /** This function is called once each time the robot enters Disabled mode. */
     override fun disabledInit() {
-        Vision.enableYagslVision = true
+        Vision.enablePoseEstimation = true
     }
 
     override fun disabledPeriodic() {}

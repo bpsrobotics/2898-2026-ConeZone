@@ -1,26 +1,20 @@
 package frc.robot.input
 
 import edu.wpi.first.wpilibj.DriverStation
-import edu.wpi.first.wpilibj.GenericHID
-import edu.wpi.first.wpilibj2.command.InstantCommand
 import edu.wpi.first.wpilibj2.command.button.Trigger
 import frc.robot.commands.swerve.CardinalAlign
 import frc.robot.commands.swerve.LockDrive
+import frc.robot.commands.swerve.ResetGyroHold
 import frc.robot.commands.swerve.TeleopDrive
 import frc.robot.subsystems.Drivetrain
 import frc.robot.utils.degrees
-import frc.robot.utils.sec
 
 @Suppress("Unused")
 fun OI.driverAndOperatorBindings() {
     /** Drivetrain */
-    // Reset Gyro
-    resetGyro
-        .debounce(0.5)
-        .onTrue(
-            InstantCommand({ Drivetrain.zeroGyro() }, Drivetrain)
-                .andThen(rumble(GenericHID.RumbleType.kLeftRumble, 0.25, 0.2.sec))
-        )
+    // Hold to zero the gyro (long hold also cuts vision odometry while it's on): slight buzz
+    // while arming, firm buzz on fire.
+    resetGyro.whileTrue(ResetGyroHold())
     // Default drive
     Drivetrain.defaultCommand =
         driveManager.alongWith(

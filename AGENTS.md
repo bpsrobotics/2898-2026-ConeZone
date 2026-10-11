@@ -10,4 +10,8 @@ Welcome to FRC Team 2898, The Flying Hedgehogs' robot code.
   `utils/Units.kt`](./src/main/kotlin/frc/robot/utils/Units.kt).
 - Put all "constants" in NetworkTables so they can be easily tested/reconfigured without deploying.
 - Style: Use Kotlinlang styles (run ktfmt) and channel YAGNI, DRY and KISS principles.
+    - Avoid class-based commands at all costs. Use compositions wherever possible.
+    - Put single-subsystem commands as methods in their respective subsystems
+        - Don’t qualify the names with `doThing` or `thingCommand` etc. except to avoid name collisions (or just pick a
+          slightly different name that doesn’t have to qualify)
 - Testing: Run `./gradlew build` to check your changes and nothing more unless the user requests otherwise.

@@ -63,8 +63,12 @@ object Vision : SubsystemBase() {
     /** Cameras already reported as missing, so we only complain once per state change. */
     private val reportedMissing = mutableSetOf<String>()
 
-    /** Whether pose estimates should be pushed into YAGSL's pose estimator. */
-    var enableYagslVision: Boolean by DashboardBoolean(true, "Vision")
+    /**
+     * Whether pose estimates should be pushed into YAGSL's pose estimator. The driver's gyro-reset
+     * hold turns this off mid-match when vision goes bad, leaving odometry relative to the zeroed
+     * heading; reset at disabled init.
+     */
+    var enablePoseEstimation: Boolean by DashboardBoolean(true, "Vision")
 
     /**
      * Master off-switch (NetworkTables `Vision/enabled`). Set to `false` to run as a defense bot:
@@ -120,7 +124,7 @@ object Vision : SubsystemBase() {
         if (!enabled) return
         for (camera in cameras) {
             for (result in camera.results) {
-                if (enableYagslVision) addVisionMeasurement(camera, result)
+                if (enablePoseEstimation) addVisionMeasurement(camera, result)
                 for (subscriber in resultSubscribers) subscriber(result, camera)
             }
         }
@@ -169,6 +173,14 @@ object Vision : SubsystemBase() {
             when {
                 !enabled ->
                     listOf(Alerts.Alert("Vision", "disabled by off-switch", Alerts.Level.WARNING))
+                !enablePoseEstimation ->
+                    listOf(
+                        Alerts.Alert(
+                            "Vision",
+                            "odometry feed disabled, pose is gyro-relative",
+                            Alerts.Level.WARNING,
+                        )
+                    )
                 failedCameras.isNotEmpty() ->
                     failedCameras.sorted().map {
                         Alerts.Alert(
