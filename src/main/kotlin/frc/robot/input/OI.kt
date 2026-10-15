@@ -1,6 +1,7 @@
 package frc.robot.input
 
 import edu.wpi.first.math.MathUtil
+import edu.wpi.first.units.Units
 import edu.wpi.first.units.measure.Time
 import edu.wpi.first.wpilibj.DriverStation
 import edu.wpi.first.wpilibj.GenericHID
@@ -14,7 +15,9 @@ import edu.wpi.first.wpilibj2.command.button.Trigger
 import frc.robot.commands.swerve.DriveManager
 import frc.robot.input.OI.process
 import frc.robot.subsystems.Drivetrain
+import frc.robot.utils.DashboardMeasure
 import frc.robot.utils.asSeconds
+import frc.robot.utils.sec
 import kotlin.math.absoluteValue
 import kotlin.math.pow
 import kotlin.math.sign
@@ -153,7 +156,7 @@ object OI : SubsystemBase() {
         rumble(side, power).withTimeout(time.asSeconds)
 
     /** Seconds each side stays on in [gyroFallbackRumble]'s left-right alternation. */
-    private const val FALLBACK_RUMBLE_HALF_PERIOD = 0.25
+    private var fallbackRumbleHalfPeriod: Time by DashboardMeasure(Units.Seconds, 0.25.sec, "OI")
 
     /**
      * Heavy alternating left-right rumble that runs until interrupted. Scheduled while the gyro is
@@ -164,7 +167,7 @@ object OI : SubsystemBase() {
         runEnd(
             {
                 val leftOn =
-                    (Timer.getFPGATimestamp() / FALLBACK_RUMBLE_HALF_PERIOD).toInt() % 2 == 0
+                    (Timer.getFPGATimestamp() / fallbackRumbleHalfPeriod.asSeconds).toInt() % 2 == 0
                 driverController.setRumble(
                     GenericHID.RumbleType.kLeftRumble,
                     if (leftOn) 1.0 else 0.0,

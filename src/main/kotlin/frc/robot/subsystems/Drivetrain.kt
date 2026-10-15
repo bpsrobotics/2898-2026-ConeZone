@@ -21,6 +21,7 @@ import edu.wpi.first.wpilibj2.command.Commands
 import edu.wpi.first.wpilibj2.command.SubsystemBase
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine
 import frc.robot.utils.DashboardBoolean
+import frc.robot.utils.DashboardMeasure
 import frc.robot.utils.angle
 import frc.robot.utils.asMeters
 import frc.robot.utils.clearUnwrappedDevice
@@ -42,8 +43,11 @@ import swervelib.telemetry.SwerveDriveTelemetry.TelemetryVerbosity
 
 object Drivetrain : SubsystemBase() {
     object Constants {
-        val MAX_SPEED = 15.1.feetPerSecond
-        val MAX_ANGULAR_SPEED = PI.radiansPerSecond
+        /** Tunable in NetworkTables (`Drivetrain/MAX_SPEED`, meters per second). */
+        var MAX_SPEED by DashboardMeasure(Units.MetersPerSecond, 15.1.feetPerSecond, "Drivetrain")
+        /** Tunable in NetworkTables (`Drivetrain/MAX_ANGULAR_SPEED`, radians per second). */
+        var MAX_ANGULAR_SPEED by
+            DashboardMeasure(Units.RadiansPerSecond, PI.radiansPerSecond, "Drivetrain")
         // Chassis configuration (left to right dist of center of the wheels)
         private val TRACK_WIDTH = 11.5.inches.asMeters
 

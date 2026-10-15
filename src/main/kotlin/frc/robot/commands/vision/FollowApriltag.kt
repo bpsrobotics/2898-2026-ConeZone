@@ -7,8 +7,8 @@ import frc.robot.subsystems.Drivetrain
 import frc.robot.subsystems.Vision
 import frc.robot.utils.asRadians
 import frc.robot.utils.degrees
-import org.photonvision.targeting.PhotonTrackedTarget
 import kotlin.math.sign
+import org.photonvision.targeting.PhotonTrackedTarget
 
 /**
  * Auto-mode follower that rotates toward an AprilTag then drives to 1m distance, all

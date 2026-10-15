@@ -1,6 +1,8 @@
 package frc.robot.utils
 
 import edu.wpi.first.networktables.NetworkTableEntry
+import edu.wpi.first.units.Measure
+import edu.wpi.first.units.Unit as WpiUnit
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard
 import kotlin.reflect.KClass
@@ -114,6 +116,60 @@ class DashboardNumber(
     operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): DashboardNumberDelegate =
         DashboardNumberDelegate(
             SmartDashboard.getEntry(mergePaths(path, property.name)),
+            initialValue,
+            persist,
+        )
+}
+
+/**
+ * A [DashboardNumber]-style delegate for WPILib [Measure] values, stored in NetworkTables as a
+ * double in [unit]. Fully general across dimensions, e.g.:
+ * ```
+ * var maxSpeed: LinearVelocity by DashboardMeasure(Units.MetersPerSecond, 15.1.feetPerSecond)
+ * ```
+ */
+class DashboardMeasureDelegate<U : WpiUnit, M : Measure<U>>(
+    private val entry: NetworkTableEntry,
+    private val unit: U,
+    private val initialValue: M,
+    persist: Boolean = false,
+) {
+    // Safe: every concrete WPILib unit overrides of() to return its own measure type
+    // (e.g. LinearVelocityUnit.of returns LinearVelocity).
+    @Suppress("UNCHECKED_CAST") private fun fromDouble(value: Double): M = unit.of(value) as M
+
+    operator fun getValue(thisRef: Any?, property: KProperty<*>): M =
+        fromDouble(entry.getDouble(initialValue.`in`(unit)))
+
+    operator fun setValue(thisRef: Any?, property: KProperty<*>, value: M) {
+        entry.setDouble(value.`in`(unit))
+    }
+
+    init {
+        if (persist) {
+            entry.setDefaultDouble(initialValue.`in`(unit))
+            entry.setPersistent()
+        } else {
+            entry.setDouble(initialValue.`in`(unit))
+            entry.clearPersistent()
+        }
+    }
+}
+
+@Suppress("unused")
+class DashboardMeasure<U : WpiUnit, M : Measure<U>>(
+    private val unit: U,
+    private val initialValue: M,
+    private val path: String = "",
+    private val persist: Boolean = false,
+) {
+    operator fun provideDelegate(
+        thisRef: Any?,
+        property: KProperty<*>,
+    ): DashboardMeasureDelegate<U, M> =
+        DashboardMeasureDelegate(
+            SmartDashboard.getEntry(mergePaths(path, property.name)),
+            unit,
             initialValue,
             persist,
         )

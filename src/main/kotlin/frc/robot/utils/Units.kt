@@ -9,6 +9,7 @@ import edu.wpi.first.units.Units
 import edu.wpi.first.units.measure.Angle
 import edu.wpi.first.units.measure.AngularAcceleration
 import edu.wpi.first.units.measure.AngularVelocity
+import edu.wpi.first.units.measure.Current
 import edu.wpi.first.units.measure.Distance
 import edu.wpi.first.units.measure.Energy
 import edu.wpi.first.units.measure.Force
@@ -18,6 +19,7 @@ import edu.wpi.first.units.measure.LinearVelocity
 import edu.wpi.first.units.measure.Mass
 import edu.wpi.first.units.measure.Power
 import edu.wpi.first.units.measure.Time
+import edu.wpi.first.units.measure.Voltage
 import kotlin.math.PI
 
 fun <U : WpiUnit> Measure<U>.convert(unit: U): Double = `in`(unit)
@@ -120,3 +122,9 @@ val Number.millijoules: Energy
     get() = Units.Millijoules.of(toDouble())
 val Number.kilojoules: Energy
     get() = Units.Kilojoules.of(toDouble())
+
+val Number.volts: Voltage
+    get() = Units.Volts.of(toDouble())
+
+val Number.amps: Current
+    get() = Units.Amps.of(toDouble())

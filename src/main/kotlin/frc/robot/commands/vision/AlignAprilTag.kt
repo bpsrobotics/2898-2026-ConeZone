@@ -11,11 +11,11 @@ import frc.robot.utils.asRadians
 import frc.robot.utils.degrees
 import frc.robot.utils.polarTranslation
 import frc.robot.utils.radians
+import org.photonvision.targeting.PhotonTrackedTarget
 import kotlin.math.absoluteValue
 import kotlin.math.cos
 import kotlin.math.sign
 import kotlin.math.sin
-import org.photonvision.targeting.PhotonTrackedTarget
 
 /**
  * Auto-mode aligner that drives robot-oriented speeds to face an AprilTag and hold [yToTag] lateral
