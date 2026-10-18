@@ -19,8 +19,8 @@ import frc.robot.utils.watts
 /**
  * REV PDH power monitor (CAN ID [Constants.PDH_CAN_ID]).
  *
- * Publishes battery voltage, total current, computed total power and per-channel currents to the
- * NT root table `PowerMonitor`, and feeds breaker/brownout/CAN faults into [Alerts] (the global
+ * Publishes battery voltage, total current, computed total power and per-channel currents to the NT
+ * root table `PowerMonitor`, and feeds breaker/brownout/CAN faults into [Alerts] (the global
  * `clearFaults` button clears sticky PDH faults too).
  *
  * Notes:
@@ -28,8 +28,8 @@ import frc.robot.utils.watts
  *   itself (both read 0 on REV hardware), and PDH temperature is likewise unsupported, so none of
  *   those are published.
  * - A live reading near 0 V while the RIO is alive means the PDH is unreachable on CAN, so all
- *   readings report `null` and an error is raised. The voltage gate is skipped in simulation,
- *   where sim power defaults to 0.
+ *   readings report `null` and an error is raised. The voltage gate is skipped in simulation, where
+ *   sim power defaults to 0.
  */
 object PowerMonitor : SubsystemBase() {
     object Constants {
@@ -50,8 +50,7 @@ object PowerMonitor : SubsystemBase() {
     private val voltagePublisher: DoublePublisher = table.getDoubleTopic("voltage").publish()
     private val totalCurrentPublisher: DoublePublisher =
         table.getDoubleTopic("totalCurrent").publish()
-    private val totalPowerPublisher: DoublePublisher =
-        table.getDoubleTopic("totalPower").publish()
+    private val totalPowerPublisher: DoublePublisher = table.getDoubleTopic("totalPower").publish()
     private val channelsPublisher: DoubleArrayPublisher =
         table.getDoubleArrayTopic("channels").publish()
 
@@ -64,8 +63,8 @@ object PowerMonitor : SubsystemBase() {
         get() = livePdh()?.let { pdh -> runCatching { pdh.totalCurrent.amps }.getOrNull() }
 
     /**
-     * Computed total power (voltage × total current), or `null` when unavailable. The PDH reports
-     * 0 for power itself, so this is derived.
+     * Computed total power (voltage × total current), or `null` when unavailable. The PDH reports 0
+     * for power itself, so this is derived.
      */
     val totalPower: Power?
         get() =
@@ -100,7 +99,9 @@ object PowerMonitor : SubsystemBase() {
 
     private fun initPdh() {
         pdh =
-            runCatching { PowerDistribution(Constants.PDH_CAN_ID, PowerDistribution.ModuleType.kRev) }
+            runCatching {
+                PowerDistribution(Constants.PDH_CAN_ID, PowerDistribution.ModuleType.kRev)
+            }
                 .getOrNull()
     }
 
@@ -120,8 +121,14 @@ object PowerMonitor : SubsystemBase() {
         if (!enabled) return null
         val pdh = pdh ?: return null
         return runCatching {
-                Snapshot(pdh.voltage, pdh.totalCurrent, pdh.allCurrents, pdh.faults, pdh.stickyFaults)
-            }
+            Snapshot(
+                pdh.voltage,
+                pdh.totalCurrent,
+                pdh.allCurrents,
+                pdh.faults,
+                pdh.stickyFaults,
+            )
+        }
             .getOrNull()
     }
 
@@ -140,8 +147,11 @@ object PowerMonitor : SubsystemBase() {
             return listOf(
                 Alerts.Alert("PowerMonitor", "disabled by off-switch", Alerts.Level.WARNING)
             )
-        val pdh = pdh ?: return listOf(Alerts.Alert(DEVICE_LABEL, "not present", Alerts.Level.ERROR))
-        val snap = readSnapshot() ?: return listOf(Alerts.Alert(DEVICE_LABEL, "unreadable", Alerts.Level.ERROR))
+        if (pdh == null)
+            return listOf(Alerts.Alert(DEVICE_LABEL, "not present", Alerts.Level.ERROR))
+        val snap =
+            readSnapshot()
+                ?: return listOf(Alerts.Alert(DEVICE_LABEL, "unreadable", Alerts.Level.ERROR))
         if (!isPlausible(snap.voltageVolts))
             return listOf(
                 Alerts.Alert(
@@ -167,26 +177,28 @@ object PowerMonitor : SubsystemBase() {
                     "breaker fault on channels ${liveChannels.joinToString()}",
                     Alerts.Level.ERROR,
                 )
-        if (sticky.Brownout)
-            alerts += Alerts.Alert(DEVICE_LABEL, "brownout recorded", Alerts.Level.WARNING)
-        if (sticky.CanWarning)
-            alerts += Alerts.Alert(DEVICE_LABEL, "CAN warning recorded", Alerts.Level.WARNING)
+        if (sticky.Brownout && !live.Brownout)
+            alerts += Alerts.Alert(DEVICE_LABEL, "brownout recorded", Alerts.Level.STICKY)
+        if (sticky.CanWarning && !live.CanWarning)
+            alerts += Alerts.Alert(DEVICE_LABEL, "CAN warning recorded", Alerts.Level.STICKY)
         if (sticky.CanBusOff)
-            alerts += Alerts.Alert(DEVICE_LABEL, "CAN bus off", Alerts.Level.ERROR)
-        if (sticky.HardwareFault)
-            alerts += Alerts.Alert(DEVICE_LABEL, "hardware fault recorded", Alerts.Level.WARNING)
+            alerts += Alerts.Alert(DEVICE_LABEL, "CAN bus off recorded", Alerts.Level.STICKY)
+        if (sticky.HardwareFault && !live.HardwareFault)
+            alerts += Alerts.Alert(DEVICE_LABEL, "hardware fault recorded", Alerts.Level.STICKY)
         if (sticky.FirmwareFault)
-            alerts += Alerts.Alert(DEVICE_LABEL, "firmware fault recorded", Alerts.Level.WARNING)
+            alerts += Alerts.Alert(DEVICE_LABEL, "firmware fault recorded", Alerts.Level.STICKY)
         if (sticky.HasReset)
-            alerts += Alerts.Alert(DEVICE_LABEL, "device has reset", Alerts.Level.WARNING)
+            alerts += Alerts.Alert(DEVICE_LABEL, "device has reset", Alerts.Level.STICKY)
         val stickyChannels =
-            (0 until snap.currentsAmps.size.coerceAtMost(24)).filter { sticky.getBreakerFault(it) }
+            (0 until snap.currentsAmps.size.coerceAtMost(24)).filter {
+                sticky.getBreakerFault(it) && it !in liveChannels
+            }
         if (stickyChannels.isNotEmpty())
             alerts +=
                 Alerts.Alert(
                     DEVICE_LABEL,
                     "breaker faults recorded on channels ${stickyChannels.joinToString()}",
-                    Alerts.Level.WARNING,
+                    Alerts.Level.STICKY,
                 )
         return alerts
     }

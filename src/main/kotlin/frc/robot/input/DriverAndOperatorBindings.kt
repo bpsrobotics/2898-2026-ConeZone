@@ -19,12 +19,7 @@ fun OI.driverAndOperatorBindings() {
     Drivetrain.defaultCommand =
         driveManager.alongWith(
             driveManager.defineDriver(
-                TeleopDrive(
-                    { -translationY },
-                    { -translationX },
-                    { -turn },
-                    { rightTrigger },
-                )
+                TeleopDrive({ -translationY }, { -translationX }, { -turn }, { rightTrigger })
             )
         )
 

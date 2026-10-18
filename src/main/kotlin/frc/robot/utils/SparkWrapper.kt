@@ -153,10 +153,6 @@ class SparkWrapper(
                 motor?.set(requestPower)
             },
         )
-        builder.addBooleanProperty(
-            "clearFaults",
-            { false },
-            { if (it) clearFaults() },
-        )
+        builder.addBooleanProperty("clearFaults", { false }, { if (it) clearFaults() })
     }
 }

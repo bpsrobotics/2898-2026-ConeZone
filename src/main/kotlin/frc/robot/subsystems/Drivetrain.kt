@@ -1,10 +1,10 @@
 package frc.robot.subsystems
 
+import com.studica.frc.AHRS
 import edu.wpi.first.math.VecBuilder
+import edu.wpi.first.math.controller.PIDController
 import edu.wpi.first.math.geometry.Pose2d
 import edu.wpi.first.math.geometry.Pose3d
-import edu.wpi.first.math.geometry.Rotation2d
-import edu.wpi.first.math.geometry.Rotation3d
 import edu.wpi.first.math.geometry.Translation2d
 import edu.wpi.first.math.kinematics.ChassisSpeeds
 import edu.wpi.first.math.kinematics.SwerveModuleState
@@ -20,12 +20,12 @@ import edu.wpi.first.wpilibj2.command.Command
 import edu.wpi.first.wpilibj2.command.Commands
 import edu.wpi.first.wpilibj2.command.SubsystemBase
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine
+import frc.robot.subsystems.Drivetrain.driveSysIdRoutine
 import frc.robot.utils.DashboardBoolean
-import frc.robot.utils.DashboardMeasure
-import frc.robot.utils.angle
 import frc.robot.utils.asMeters
 import frc.robot.utils.clearUnwrappedDevice
-import frc.robot.utils.convert
+import frc.robot.utils.degrees
+import frc.robot.utils.degreesPerSecond
 import frc.robot.utils.feetPerSecond
 import frc.robot.utils.inches
 import frc.robot.utils.radiansPerSecond
@@ -33,28 +33,23 @@ import frc.robot.utils.unwrappedDeviceAlerts
 import java.io.File
 import kotlin.jvm.optionals.getOrNull
 import kotlin.math.PI
-import swervelib.SwerveDrive
-import swervelib.SwerveDriveTest
-import swervelib.encoders.SwerveAbsoluteEncoder
-import swervelib.motors.SwerveMotor
 import swervelib.parser.SwerveParser
-import swervelib.telemetry.SwerveDriveTelemetry
-import swervelib.telemetry.SwerveDriveTelemetry.TelemetryVerbosity
+import yams.mechanisms.config.SwerveDriveConfig
+import yams.mechanisms.swerve.SwerveDrive
+import yams.motorcontrollers.SmartMotorControllerConfig.TelemetryVerbosity
+import yams.telemetry.SwerveDriveTelemetryConfig
 
 object Drivetrain : SubsystemBase() {
     object Constants {
-        /** Tunable in NetworkTables (`Drivetrain/MAX_SPEED`, meters per second). */
-        var MAX_SPEED by DashboardMeasure(Units.MetersPerSecond, 15.1.feetPerSecond, "Drivetrain")
-        /** Tunable in NetworkTables (`Drivetrain/MAX_ANGULAR_SPEED`, radians per second). */
-        var MAX_ANGULAR_SPEED by
-            DashboardMeasure(Units.RadiansPerSecond, PI.radiansPerSecond, "Drivetrain")
+        val MAX_SPEED = 15.1.feetPerSecond
+        val MAX_ANGULAR_SPEED = PI.radiansPerSecond
         // Chassis configuration (left to right dist of center of the wheels)
         private val TRACK_WIDTH = 11.5.inches.asMeters
 
         // Distance between centers of right and left wheels on robot (front to back dist)
         private val WHEEL_BASE = 11.5.inches.asMeters
 
-        // Distance between front and back wheels on robot: CHANGE TO MATCH WITH ROBOT
+        // Swerve module positions for [../Autos.kt]
         val DRIVE_KINEMATICS =
             arrayOf(
                 Translation2d(WHEEL_BASE / 2, TRACK_WIDTH / 2),
@@ -68,8 +63,6 @@ object Drivetrain : SubsystemBase() {
         val ROBOT_WIDTH = 29.inches
         // val BUMPER_WIDTH = 35.inches
     }
-
-    private val swerveDrive: SwerveDrive
 
     /**
      * Master off-switch (NetworkTables `Drivetrain/enabled`). Set to `false` to run as a defense
@@ -93,31 +86,40 @@ object Drivetrain : SubsystemBase() {
     private val posePublisher: StructPublisher<Pose2d> =
         NetworkTableInstance.getDefault().getStructTopic("RobotPose", Pose2d.struct).publish()
 
+    /**
+     * NavX IMU. YAGSL 2026.9.17 dropped SPI NavX support from `swervedrive.json` (only `navx3_can`
+     * is parsed), so it is supplied to the [SwerveDriveConfig] directly via
+     * [SwerveDriveConfig.withGyro].
+     */
+    val navX = AHRS(AHRS.NavXComType.kMXP_SPI)
+
+    private val config: SwerveDriveConfig =
+        SwerveDriveConfig()
+            .withSubsystem(this)
+            // Negated: RIO is upside-down
+            .withGyro { -navX.angle.degrees }
+            .withGyroVelocity { -navX.rate.degreesPerSecond }
+            .withGyroInverted(false)
+            // .withGyroOffset(...), .withGyroVelocity(...) are also available
+            // these controllers are used in [SwerveDrive.driveToPose]:
+            .withTranslationController(PIDController(4.0, 0.0, 0.0))
+            .withRotationController(PIDController(1.0, 0.0, 0.0))
+            .withMaximumChassisSpeed(Constants.MAX_SPEED, Constants.MAX_ANGULAR_SPEED)
+            .withTelemetry("swerve", SwerveDriveTelemetryConfig(TelemetryVerbosity.HIGH))
+
+    private val swerveDevices: SwerveParser.SwerveDriveDevices
+    private val swerveDrive: SwerveDrive
+
     init {
-        // Configure the Telemetry before creating the SwerveDrive to avoid unnecessary objects
-        // being created.
-        SwerveDriveTelemetry.verbosity = TelemetryVerbosity.HIGH
-
-        swerveDrive =
-            SwerveParser(Constants.DRIVE_CONFIG)
-                .createSwerveDrive(Constants.MAX_SPEED.convert(Units.MetersPerSecond))
-
-        // Set YAGSL preferences
-        swerveDrive.setHeadingCorrection(false)
-        // Heading correction should only be used while controlling the robot via angle.
-        swerveDrive.setCosineCompensator(true)
-        // !SwerveDriveTelemetry.isSimulation); // Disables cosine compensation for simulations
-        // since it causes discrepancies not seen in real life.
-        swerveDrive.setMotorIdleMode(false)
-
-        swerveDrive.setGyroOffset(Rotation3d(0.0, 0.0, 0.0))
+        // why does SwerveParser use global state?
+        // the world may never know
+        SwerveParser.parse(Constants.DRIVE_CONFIG)
+        swerveDevices = SwerveParser.createSwerveDriveDevices(config)
+        swerveDrive = swerveDevices.swerveDrive()
 
         // Vision odometry is pushed by the Vision subsystem itself via
         // [addVisionMeasurement] (gated by Vision.enableYagslVision).
         setVisionMeasurementStdDevs(3.0, 4.0, 5.0)
-        // setupPathPlanner()
-
-        //        targetPoseProvider.initialize()
 
         registerHealth()
     }
@@ -131,72 +133,38 @@ object Drivetrain : SubsystemBase() {
             if (enabled) emptyList()
             else listOf(Alerts.Alert("Drivetrain", "disabled by off-switch", Alerts.Level.WARNING))
         }
-        for ((index, module) in swerveDrive.modules.withIndex()) {
-            monitorMotor("Drivetrain/module$index/drive", module.driveMotor)
-            monitorMotor("Drivetrain/module$index/angle", module.angleMotor)
-            monitorEncoder("Drivetrain/module$index/encoder", module.absoluteEncoder)
+        // Module devices are in the same order as the JSON names in `swervedrive.json`.
+        val moduleNames = SwerveParser.swerveDriveJson.modules
+        for ((index, module) in swerveDevices.modules().withIndex()) {
+            val name = moduleNames.getOrNull(index)?.substringBeforeLast('.') ?: "module$index"
+            registerRawDevice("Drivetrain/$name/drive", module.drive())
+            registerRawDevice("Drivetrain/$name/angle", module.azimuth())
+            registerRawDevice("Drivetrain/$name/encoder", module.absoluteEncoder())
         }
-        Alerts.register(
-            "Drivetrain/IMU",
-            { runCatching { swerveDrive.gyro.clearStickyFaults() } },
-        ) {
-            imuAlerts()
-        }
+        Alerts.register("Drivetrain/IMU", {}) { imuAlerts() }
     }
 
-    /** Registers a YAGSL drive/angle motor, dispatching on the wrapped vendor device. */
-    private fun monitorMotor(label: String, motor: SwerveMotor) {
-        Alerts.register(label, { clearUnwrappedDevice(runCatching { motor.motor }.getOrNull()) }) {
-            val raw = runCatching { motor.motor }.getOrNull()
-            val alerts = unwrappedDeviceAlerts(label, raw).toMutableList()
-            if (alerts.isEmpty()) {
-                // Unknown device type: fall back to a live-read probe.
-                if (
-                    runCatching {
-                        motor.position
-                        motor.velocity
-                    }
-                        .isFailure
-                )
-                    alerts += Alerts.Alert(label, "unreadable", Alerts.Level.ERROR)
-            }
-            alerts
-        }
-    }
-
-    /** Registers a YAGSL absolute encoder, combining the read-error flag with vendor faults. */
-    private fun monitorEncoder(label: String, encoder: SwerveAbsoluteEncoder) {
-        Alerts.register(label, { runCatching { encoder.clearStickyFaults() } }) {
-            val alerts = mutableListOf<Alerts.Alert>()
-            if (runCatching { encoder.readingError }.getOrDefault(false))
-                alerts += Alerts.Alert(label, "absolute encoder read issue", Alerts.Level.ERROR)
-            val raw = runCatching { encoder.absoluteEncoder }.getOrNull()
-            if (raw != null && runCatching { encoder.absolutePosition }.isFailure)
-                alerts += Alerts.Alert(label, "unreadable", Alerts.Level.ERROR)
-            alerts += unwrappedDeviceAlerts(label, raw)
-            alerts
-        }
+    /** Registers a raw vendor device (motor controller / encoder) with [Alerts]. */
+    private fun registerRawDevice(label: String, raw: Any?) {
+        Alerts.register(label, { clearUnwrappedDevice(raw) }) { unwrappedDeviceAlerts(label, raw) }
     }
 
     /** Live IMU health: gyro probe plus wrapped-vendor faults. Empty when healthy. */
     private fun imuAlerts(): List<Alerts.Alert> {
         val alerts = mutableListOf<Alerts.Alert>()
-        if (runCatching { swerveDrive.gyro.rotation3d }.isFailure)
+        if (runCatching { swerveDrive.gyroAngle }.isFailure)
             alerts += Alerts.Alert("Drivetrain/IMU", "unreadable", Alerts.Level.ERROR)
-        alerts +=
-            unwrappedDeviceAlerts(
-                "Drivetrain/IMU",
-                runCatching { swerveDrive.gyro.imu }.getOrNull(),
-            )
+        alerts += unwrappedDeviceAlerts("Drivetrain/IMU", navX)
         return alerts
     }
 
     override fun periodic() {
+        swerveDrive.updateTelemetry()
         imuOk = imuAlerts().none { it.level == Alerts.Level.ERROR }
         posePublisher.set(pose)
-        swerveStatePublisher.set(swerveDrive.states)
+        swerveStatePublisher.set(swerveDrive.moduleStates)
         if (!enabled) {
-            swerveDrive.drive(ChassisSpeeds())
+            swerveDrive.setRobotRelativeChassisSpeeds(ChassisSpeeds())
             return
         }
         Vision.setAllCameraReferences(Pose3d(pose))
@@ -215,18 +183,18 @@ object Drivetrain : SubsystemBase() {
      */
     fun driveFieldOriented(speeds: ChassisSpeeds) {
         if (!enabled) {
-            swerveDrive.drive(ChassisSpeeds())
+            swerveDrive.setRobotRelativeChassisSpeeds(ChassisSpeeds())
             return
         }
-        swerveDrive.driveFieldOriented(speeds)
+        swerveDrive.setFieldRelativeChassisSpeeds(speeds)
     }
 
     fun driveRobotOriented(speeds: ChassisSpeeds) {
         if (!enabled) {
-            swerveDrive.drive(ChassisSpeeds())
+            swerveDrive.setRobotRelativeChassisSpeeds(ChassisSpeeds())
             return
         }
-        swerveDrive.drive(speeds)
+        swerveDrive.setRobotRelativeChassisSpeeds(speeds)
     }
 
     fun stop() {
@@ -255,25 +223,131 @@ object Drivetrain : SubsystemBase() {
         Commands.run({ driveRobotOriented(speeds()) }, this)
 
     /**
-     * Return SysID command for drive motors from YAGSL
+     * Generic WPILib SysId routine for the drive motors.
      *
-     * @param spin whether to spin in place instead of driving straight (defaults to true,
-     *   preserving the previous behavior).
+     * Follows the WPILib "Creating an Identification Routine" pattern used by CTRE's swerve example
+     * and described across ChiefDelphi: the drive callback sends the routine voltage to every drive
+     * motor, and the log callback records per-module voltage, angular position, and angular
+     * velocity (same signals YAMS logged in PR #73). Wheels are pre-aligned straight ahead so the
+     * robot drives in a straight line, matching a translation characterization. Needs ~10-20 ft of
+     * space per WPILib docs.
+     */
+    private val driveSysIdRoutine =
+        SysIdRoutine(
+            SysIdRoutine.Config(),
+            SysIdRoutine.Mechanism(
+                { voltage ->
+                    swerveDrive.modules.forEach { it.driveMotorController.voltage = voltage }
+                },
+                { log ->
+                    swerveDrive.modules.forEach { mod ->
+                        log.motor(mod.driveMotorController.name)
+                            .voltage(mod.driveMotorController.voltage)
+                            .angularPosition(mod.driveMotorController.mechanismPosition)
+                            .angularVelocity(mod.driveMotorController.mechanismVelocity)
+                    }
+                },
+                this,
+            ),
+        )
+
+    /**
+     * Generic WPILib SysId routine for the azimuth (angle) motors.
+     *
+     * Same pattern as [driveSysIdRoutine] but driving every azimuth motor and logging its signals.
+     */
+    private val angleSysIdRoutine =
+        SysIdRoutine(
+            SysIdRoutine.Config(),
+            SysIdRoutine.Mechanism(
+                { voltage ->
+                    swerveDrive.modules.forEach { it.azimuthMotorController.voltage = voltage }
+                },
+                { log ->
+                    swerveDrive.modules.forEach { mod ->
+                        log.motor(mod.azimuthMotorController.name)
+                            .voltage(mod.azimuthMotorController.voltage)
+                            .angularPosition(mod.azimuthMotorController.mechanismPosition)
+                            .angularVelocity(mod.azimuthMotorController.mechanismVelocity)
+                    }
+                },
+                this,
+            ),
+        )
+
+    /** Align all azimuths straight ahead (0 rotations) for a drive-straight SysId run. */
+    private fun alignModulesStraight() {
+        swerveDrive.modules.forEach {
+            it.azimuthMotorController.setPosition(Units.Rotations.of(0.0))
+        }
+    }
+
+    /**
+     * Align all azimuths tangentially (per-module angle for pure rotation) for a spin-in-place
+     * SysId run. Same idea as the old `SwerveDriveTest` `testWithSpinning` option and YAMS PR #73
+     * `DriveSysIdTestType.SPIN`: the robot rotates about its center instead of driving away, so no
+     * long linear area is needed.
+     */
+    private fun alignModulesTangential() {
+        val rotaryStates = swerveDrive.kinematics.toSwerveModuleStates(ChassisSpeeds(0.0, 0.0, 1.0))
+        swerveDrive.modules.forEachIndexed { i, mod ->
+            mod.azimuthMotorController.setPosition(Units.Radians.of(rotaryStates[i].angle.radians))
+        }
+    }
+
+    /**
+     * Combined SysId command for drive motors (replaces removed `SwerveDriveTest`).
+     *
+     * Runs quasistatic forward/reverse then dynamic forward/reverse with settle delays, mirroring
+     * the old `SwerveDriveTest.generateSysIdCommand(routine, 3.0, 5.0, 3.0)` timings. Stops the
+     * drive closed-loop controllers for the run (required by YAMS before out-of-band `setVoltage`)
+     * and restarts them afterwards.
+     *
+     * @param spin if true, aligns modules tangentially so the robot spins in place (old
+     *   `testWithSpinning` behavior) instead of driving in a straight line.
      * @return A command that SysIDs the drive motors.
      */
-    fun sysIdDriveMotors(spin: Boolean = true): Command? {
-        return SwerveDriveTest.generateSysIdCommand(
-            SwerveDriveTest.setDriveSysIdRoutine(
-                SysIdRoutine.Config(),
-                this,
-                swerveDrive,
-                12.0,
-                spin,
-            ),
-            3.0,
-            5.0,
-            3.0,
-        )
+    fun sysIdDriveMotors(spin: Boolean = false): Command {
+        val label = if (spin) "spin " else ""
+        return Commands.print("Starting drive ${label}SysId!")
+            .andThen(
+                Commands.runOnce(
+                    { if (spin) alignModulesTangential() else alignModulesStraight() },
+                    this,
+                )
+            )
+            .andThen(
+                Commands.print("Waiting for wheels to align").andThen(Commands.waitSeconds(1.5))
+            )
+            .andThen(
+                Commands.runOnce(
+                    {
+                        swerveDrive.modules.forEach {
+                            it.driveMotorController.stopClosedLoopController()
+                        }
+                    },
+                    this,
+                )
+            )
+            .andThen(
+                driveSysIdRoutine.quasistatic(SysIdRoutine.Direction.kForward).withTimeout(5.0)
+            )
+            .andThen(Commands.waitSeconds(3.0))
+            .andThen(
+                driveSysIdRoutine.quasistatic(SysIdRoutine.Direction.kReverse).withTimeout(5.0)
+            )
+            .andThen(Commands.waitSeconds(3.0))
+            .andThen(driveSysIdRoutine.dynamic(SysIdRoutine.Direction.kForward).withTimeout(3.0))
+            .andThen(Commands.waitSeconds(3.0))
+            .andThen(driveSysIdRoutine.dynamic(SysIdRoutine.Direction.kReverse).withTimeout(3.0))
+            .finallyDo(
+                Runnable {
+                    swerveDrive.modules.forEach {
+                        it.driveMotorController.startClosedLoopController()
+                    }
+                }
+            )
+            .andThen(Commands.print("Done with drive ${label}SysId!"))
     }
 
     /**
@@ -282,42 +356,46 @@ object Drivetrain : SubsystemBase() {
      *
      * @return A command that SysIDs the drive motors while spinning.
      */
-    fun sysIdDriveMotorsSpin(): Command? = sysIdDriveMotors(spin = true)
+    fun sysIdDriveMotorsSpin(): Command = sysIdDriveMotors(spin = true)
 
     /**
-     * Return SysID command for angle motors from YAGSL
+     * Combined SysId command for angle motors (replaces removed `SwerveDriveTest`).
+     *
+     * Same structure as [sysIdDriveMotors] but for the azimuth motors.
      *
      * @return A command that SysIDs the angle motors.
      */
     fun sysIdAngleMotors(): Command {
-        return SwerveDriveTest.generateSysIdCommand(
-            SwerveDriveTest.setAngleSysIdRoutine(SysIdRoutine.Config(), this, swerveDrive),
-            3.0,
-            5.0,
-            3.0,
-        )
-    }
-
-    /**
-     * Advanced drive method that translates and rotates the robot, with a custom center of
-     * rotation.
-     *
-     * @param translation The desired X and Y velocity of the robot.
-     * @param rotation The desired rotational velocity of the robot.
-     * @param fieldOriented Whether the robot's motion should be field-oriented or robot-oriented.
-     * @param centerOfRotation The center of rotation of the robot.
-     */
-    fun drive(
-        translation: Translation2d,
-        rotation: Double = 0.0,
-        fieldOriented: Boolean = false,
-        centerOfRotation: Translation2d = Translation2d(),
-    ) {
-        if (!enabled) {
-            swerveDrive.drive(ChassisSpeeds())
-            return
-        }
-        swerveDrive.drive(translation, rotation, fieldOriented, false, centerOfRotation)
+        return Commands.print("Starting azimuth SysId!")
+            .andThen(
+                Commands.runOnce(
+                    {
+                        swerveDrive.modules.forEach {
+                            it.azimuthMotorController.stopClosedLoopController()
+                        }
+                    },
+                    this,
+                )
+            )
+            .andThen(
+                angleSysIdRoutine.quasistatic(SysIdRoutine.Direction.kForward).withTimeout(5.0)
+            )
+            .andThen(Commands.waitSeconds(3.0))
+            .andThen(
+                angleSysIdRoutine.quasistatic(SysIdRoutine.Direction.kReverse).withTimeout(5.0)
+            )
+            .andThen(Commands.waitSeconds(3.0))
+            .andThen(angleSysIdRoutine.dynamic(SysIdRoutine.Direction.kForward).withTimeout(3.0))
+            .andThen(Commands.waitSeconds(3.0))
+            .andThen(angleSysIdRoutine.dynamic(SysIdRoutine.Direction.kReverse).withTimeout(3.0))
+            .finallyDo(
+                Runnable {
+                    swerveDrive.modules.forEach {
+                        it.azimuthMotorController.startClosedLoopController()
+                    }
+                }
+            )
+            .andThen(Commands.print("Done with azimuth SysId!"))
     }
 
     /**
@@ -328,10 +406,11 @@ object Drivetrain : SubsystemBase() {
      */
     fun drive(velocity: ChassisSpeeds, fieldOriented: Boolean = false) {
         if (!enabled) {
-            swerveDrive.drive(ChassisSpeeds())
+            swerveDrive.setRobotRelativeChassisSpeeds(ChassisSpeeds())
             return
         }
-        if (fieldOriented) swerveDrive.driveFieldOriented(velocity) else swerveDrive.drive(velocity)
+        if (fieldOriented) swerveDrive.setFieldRelativeChassisSpeeds(velocity)
+        else swerveDrive.setRobotRelativeChassisSpeeds(velocity)
     }
 
     /** A ChassisSpeeds consumer used to drive the robot (Mainly for the purposes of PathPlanner) */
@@ -350,9 +429,12 @@ object Drivetrain : SubsystemBase() {
         runCatching { swerveDrive.resetOdometry(initialHolonomicPose) }
     }
 
-    /** Returns the current pose of the robot. */
-    val pose
-        get() = Pose2d(swerveDrive.pose.x, swerveDrive.pose.y, swerveDrive.pose.rotation)
+    /**
+     * Returns the current pose of the robot, relative to the initial (init/reset) position. Always
+     * available.
+     */
+    val pose: Pose2d
+        get() = swerveDrive.pose
 
     /**
      * Returns the current pose of the robot relative to the field, or null until a vision
@@ -367,69 +449,21 @@ object Drivetrain : SubsystemBase() {
         hasFieldPose = false
     }
 
-    /** Method to get the current heading (yaw) of the robot. */
-    private val heading: Rotation2d
-        get() = swerveDrive.yaw
-
     /**
      * Raw gyro yaw, or `null` when the subsystem is switched off or the IMU is unreadable.
      * Consumers must fall back (robot-oriented drive, pose-only heading) instead of assuming zero.
      */
     val rawYaw: Angle?
         get() =
-            if (!fieldOrientedAvailable) null
-            else runCatching { swerveDrive.gyro.rotation3d.toRotation2d().angle }.getOrNull()
-
-    /**
-     * Method to generate a ChassisSpeeds object from a desired X, Y, and Rotational velocity.
-     *
-     * @param vForward The desired forward velocity of the robot.
-     * @param vSide The desired side velocity of the robot.
-     * @param angle The desired rotational velocity of the robot.
-     * @return The generated ChassisSpeeds object.
-     */
-    @Suppress("unused")
-    fun getTargetSpeeds(vForward: Double, vSide: Double, angle: Rotation2d): ChassisSpeeds =
-        swerveDrive.swerveController.getTargetSpeeds(
-            vForward,
-            vSide,
-            angle.radians,
-            heading.radians,
-            Constants.MAX_SPEED.convert(Units.MetersPerSecond),
-        )
-
-    /**
-     * Method to generate a ChassisSpeeds object from a desired X, Y, and angle X and Y components.
-     *
-     * @param vForward The desired forward velocity of the robot.
-     * @param vSide The desired side velocity of the robot.
-     * @param headingX The desired X component of the angle.
-     * @param headingY The desired Y component of the angle.
-     * @return The generated ChassisSpeeds object.
-     */
-    @Suppress("unused")
-    fun getTargetSpeeds(
-        vForward: Double,
-        vSide: Double,
-        headingX: Double,
-        headingY: Double,
-    ): ChassisSpeeds =
-        swerveDrive.swerveController.getTargetSpeeds(
-            vForward,
-            vSide,
-            headingX,
-            headingY,
-            heading.radians,
-            Constants.MAX_SPEED.convert(Units.MetersPerSecond),
-        )
+            if (!fieldOrientedAvailable) null else runCatching { swerveDrive.gyroAngle }.getOrNull()
 
     /** Returns the current field oriented velocity of the robot. */
     val fieldVelocity: ChassisSpeeds
-        get() = swerveDrive.fieldVelocity
+        get() = swerveDrive.fieldRelativeSpeed
 
     /** Returns the current robot oriented velocity of the robot. */
     val robotVelocity: ChassisSpeeds
-        get() = swerveDrive.robotVelocity
+        get() = swerveDrive.robotRelativeSpeed
 
     /** Method to toggle the lock position of the swerve drive to prevent motion. */
     fun lock() {
@@ -469,8 +503,6 @@ object Drivetrain : SubsystemBase() {
      */
     @Suppress("SameParameterValue")
     private fun setVisionMeasurementStdDevs(stdDevX: Double, stdDevY: Double, stdDevTheta: Double) {
-        swerveDrive.swerveDrivePoseEstimator.setVisionMeasurementStdDevs(
-            VecBuilder.fill(stdDevX, stdDevY, stdDevTheta)
-        )
+        swerveDrive.setVisionMeasurementStdDevs(VecBuilder.fill(stdDevX, stdDevY, stdDevTheta))
     }
 }

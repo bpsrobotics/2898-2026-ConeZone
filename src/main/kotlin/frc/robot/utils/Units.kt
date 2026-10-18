@@ -73,6 +73,8 @@ val Number.radiansPerSecond: AngularVelocity
     get() = Units.RadiansPerSecond.of(toDouble())
 val Number.rotationsPerSecond: AngularVelocity
     get() = Units.RotationsPerSecond.of(toDouble())
+val Number.degreesPerSecond: AngularVelocity
+    get() = Units.DegreesPerSecond.of(toDouble())
 val Number.RPM: AngularVelocity
     get() = Units.RPM.of(toDouble())
 

@@ -14,7 +14,6 @@ import frc.robot.utils.sec
 
 /**
  * Hold-to-confirm gyro reset, bound to [OI.resetGyro].
- *
  * - If vision odometry is on at press time, the hold is long ([longHold]) and firing also turns the
  *   YAGSL vision feed off, leaving odometry relative to the zeroed heading for the rest of the
  *   match. Full vision stays alive: tag-relative aligners don't need the field frame, so the driver
@@ -54,10 +53,7 @@ class ResetGyroHold : Command() {
             if (disablesVision) Vision.enablePoseEstimation = false
             Drivetrain.zeroGyro()
         }
-        OI.driverController.setRumble(
-            GenericHID.RumbleType.kBothRumble,
-            if (fired) 0.6 else 0.15,
-        )
+        OI.driverController.setRumble(GenericHID.RumbleType.kBothRumble, if (fired) 0.6 else 0.15)
     }
 
     override fun isFinished(): Boolean {

@@ -18,7 +18,8 @@ import frc.robot.subsystems.Alerts.Level
  * Conventions:
  * - An [Level.ERROR] means readings from the device are unreliable; consumers must treat the
  *   corresponding measurement as `null` and fall back or shut off.
- * - A [Level.WARNING] means degraded-but-usable (sticky faults, resets, calibration, ...).
+ * - A [Level.WARNING] means an active degraded-but-usable condition (calibration, ...).
+ * - A [Level.STICKY] means a non-active recorded condition (sticky faults, resets, ...).
  */
 fun SparkBase.Faults.describe(): String {
     val result = mutableListOf<String>()
@@ -46,22 +47,43 @@ fun SparkBase.Warnings.describe(): String {
     return result.joinToString()
 }
 
+/** REV fault/warning bitfields only define the low 8 bits. */
+private const val SPARK_KNOWN_BITS = 0xFF
+
+/**
+ * True when a REV bitfield is all-ones. An absent or mis-ID'd controller reads back every bit set,
+ * which describes() would otherwise render as literally every fault at once.
+ */
+private fun isAbsentReading(rawBits: Int): Boolean =
+    (rawBits and SPARK_KNOWN_BITS) == SPARK_KNOWN_BITS
+
 /** Active [Alerts] for a present [SparkMax]; empty when fully healthy. */
 fun SparkMax.healthAlerts(label: String): List<Alert> {
+    val faults = this.faults
+    val warnings = this.warnings
+    if (
+        faults != null &&
+            warnings != null &&
+            isAbsentReading(faults.rawBits) &&
+            isAbsentReading(warnings.rawBits)
+    )
+        return listOf(Alert(label, "not connected", Level.ERROR))
     val errorStrings = mutableListOf<String>()
     val warningStrings = mutableListOf<String>()
+    val stickyStrings = mutableListOf<String>()
     faults?.let { if (it.describe().isNotEmpty()) errorStrings.add("faults: ${it.describe()}") }
     warnings?.let {
         if (it.describe().isNotEmpty()) warningStrings.add("warnings: ${it.describe()}")
     }
     stickyFaults?.let {
-        if (it.describe().isNotEmpty()) warningStrings.add("sticky faults: ${it.describe()}")
+        if (it.describe().isNotEmpty()) stickyStrings.add("sticky faults: ${it.describe()}")
     }
     stickyWarnings?.let {
-        if (it.describe().isNotEmpty()) warningStrings.add("sticky warnings: ${it.describe()}")
+        if (it.describe().isNotEmpty()) stickyStrings.add("sticky warnings: ${it.describe()}")
     }
     return errorStrings.map { Alert(label, it, Level.ERROR) } +
-        warningStrings.map { Alert(label, it, Level.WARNING) }
+        warningStrings.map { Alert(label, it, Level.WARNING) } +
+        stickyStrings.map { Alert(label, it, Level.STICKY) }
 }
 
 /**
@@ -92,10 +114,10 @@ fun ctreAlerts(
             Alert(
                 label,
                 "sticky faults recorded (field=0x${stickyBits.toString(16)})",
-                Level.WARNING,
+                Level.STICKY,
             )
         )
-    if (hasReset) alerts.add(Alert(label, "device has reset", Level.WARNING))
+    if (hasReset) alerts.add(Alert(label, "device has reset", Level.STICKY))
     return alerts
 }
 
@@ -104,15 +126,9 @@ fun ctreAlerts(
  * type-specific overloads ([registerTalonFX], [registerCANcoder], [registerPigeon2]) which also
  * report fault bitfields.
  */
-fun Alerts.registerCtreDevice(
-    label: String,
-    device: ParentDevice,
-    clearStickyFaults: () -> Unit,
-) {
+fun Alerts.registerCtreDevice(label: String, device: ParentDevice, clearStickyFaults: () -> Unit) {
     register(label, clearStickyFaults) {
-        runCatching {
-            ctreAlerts(label, device.isConnected(), null, null, device.hasResetOccurred())
-        }
+        runCatching { ctreAlerts(label, device.isConnected, null, null, device.hasResetOccurred()) }
             .getOrElse { listOf(Alert(label, "unreachable: ${it.message}", Level.ERROR)) }
     }
 }
@@ -156,7 +172,7 @@ fun ctrePollAlerts(
     return runCatching {
         ctreAlerts(
             label,
-            device.isConnected(),
+            device.isConnected,
             faults.value,
             sticky.value,
             device.hasResetOccurred(),
@@ -188,9 +204,8 @@ fun unwrappedDeviceAlerts(label: String, raw: Any?): List<Alert> =
                 }
             }
                 .getOrElse { listOf(Alert(label, "unreachable: ${it.message}", Level.ERROR)) }
-        is ParentDevice -> runCatching {
-                ctreAlerts(label, raw.isConnected(), null, null, raw.hasResetOccurred())
-            }
+        is ParentDevice ->
+            runCatching { ctreAlerts(label, raw.isConnected, null, null, raw.hasResetOccurred()) }
                 .getOrElse { listOf(Alert(label, "unreachable: ${it.message}", Level.ERROR)) }
         else -> emptyList()
     }

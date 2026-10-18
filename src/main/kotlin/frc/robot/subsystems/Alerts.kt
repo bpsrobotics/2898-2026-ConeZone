@@ -4,7 +4,7 @@ import edu.wpi.first.networktables.BooleanPublisher
 import edu.wpi.first.networktables.BooleanSubscriber
 import edu.wpi.first.networktables.IntegerPublisher
 import edu.wpi.first.networktables.NetworkTableInstance
-import edu.wpi.first.networktables.StringArrayPublisher
+import edu.wpi.first.networktables.StringPublisher
 import edu.wpi.first.wpilibj.DriverStation
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard
 import edu.wpi.first.wpilibj2.command.Command
@@ -18,10 +18,11 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase
  * [Source] here. Once per cycle [Alerts] polls all sources and publishes the active errors and
  * warnings to NetworkTables under the `Alerts` table, replacing the old per-vendor error sets (e.g.
  * `SparkWrapper.sparksWithErrors`).
- *
  * - `Alerts/errors`: string array of `"[source] message"` for conditions that make data unusable.
- * - `Alerts/warnings`: string array for degraded-but-usable conditions (sticky faults, disabled
- *   subsystems, ...).
+ * - `Alerts/warnings`: string array for active degraded-but-usable conditions (disabled subsystems,
+ *   ...).
+ * - `Alerts/stickyFaults`: string array for non-active recorded conditions (sticky faults, resets,
+ *   ...) that no longer affect behavior.
  * - `Alerts/clearFaults`: set to `true` from a dashboard to call `clearFaults` (or equivalent) on
  *   every registered source. Automatically reset to `false` once handled.
  *
@@ -32,6 +33,7 @@ object Alerts : SubsystemBase() {
     enum class Level {
         ERROR,
         WARNING,
+        STICKY,
     }
 
     data class Alert(val source: String, val message: String, val level: Level) {
@@ -40,11 +42,11 @@ object Alerts : SubsystemBase() {
 
     /**
      * A fallible device or subsystem that contributes to [Alerts].
-     *
      * - [getAlerts] must never throw for a merely-disconnected device; throw only on monitor bugs
      *   (thrown exceptions are converted to errors automatically). Return an [Alert] with
      *   [Level.ERROR] when readings from this source are unreliable and consumers must fall back,
-     *   [Level.WARNING] when degraded but usable.
+     *   [Level.WARNING] when actively degraded but usable, [Level.STICKY] for non-active recorded
+     *   conditions (sticky faults, resets, ...).
      * - [clearFaults] must clear sticky faults / retry initialization, and never throw.
      */
     interface Source {
@@ -56,14 +58,16 @@ object Alerts : SubsystemBase() {
     }
 
     private val table = NetworkTableInstance.getDefault().getTable("Alerts")
-    private val errorsPublisher: StringArrayPublisher =
-        table.getStringArrayTopic("errors").publish()
-    private val warningsPublisher: StringArrayPublisher =
-        table.getStringArrayTopic("warnings").publish()
+    private val errorsPublisher: StringPublisher = table.getStringTopic("errors").publish()
+    private val warningsPublisher: StringPublisher = table.getStringTopic("warnings").publish()
+    private val stickyFaultsPublisher: StringPublisher =
+        table.getStringTopic("stickyFaults").publish()
     private val errorCountPublisher: IntegerPublisher =
         table.getIntegerTopic("errorCount").publish()
     private val warningCountPublisher: IntegerPublisher =
         table.getIntegerTopic("warningCount").publish()
+    private val stickyCountPublisher: IntegerPublisher =
+        table.getIntegerTopic("stickyFaultCount").publish()
     private val clearFaultsPublisher: BooleanPublisher =
         table.getBooleanTopic("clearFaults").publish()
     private val clearFaultsSubscriber: BooleanSubscriber =
@@ -110,9 +114,7 @@ object Alerts : SubsystemBase() {
     /** Calls `clearFaults` (or equivalent) on every registered source. Never throws. */
     fun clearAllFaults() {
         synchronized(this) { sources.toList() }
-            .forEach { source ->
-                runCatching { source.clearFaults() }
-            }
+            .forEach { source -> runCatching { source.clearFaults() } }
     }
 
     /** Dashboard-button command that clears faults on everything. */
@@ -143,13 +145,19 @@ object Alerts : SubsystemBase() {
 
         val alerts = activeAlerts()
         val errors = alerts.filter { it.level == Level.ERROR }.map(Alert::toString)
-        val warnings = alerts.filter { it.level == Level.WARNING }.map(Alert::toString)
-        errorsPublisher.set(errors.toTypedArray())
-        warningsPublisher.set(warnings.toTypedArray())
+        val warnings =
+            alerts
+                .filter { it.level == Level.WARNING && it.toString() !in errors }
+                .map(Alert::toString)
+        val stickyFaults = alerts.filter { it.level == Level.STICKY }.map(Alert::toString)
+        errorsPublisher.set(errors.joinToString("\n"))
+        warningsPublisher.set(warnings.joinToString("\n"))
+        stickyFaultsPublisher.set(stickyFaults.joinToString("\n"))
         errorCountPublisher.set(errors.size.toLong())
         warningCountPublisher.set(warnings.size.toLong())
+        stickyCountPublisher.set(stickyFaults.size.toLong())
 
-        val current = (errors + warnings).toSet()
+        val current = (errors + warnings + stickyFaults).toSet()
         val fresh = current - reportedMessages
         for (message in fresh.sorted()) {
             if (message in errors) DriverStation.reportError("Alerts: $message", false)
