@@ -1,7 +1,7 @@
 {
-  "fileName": "yagsl-2026.9.17.json",
+  "fileName": "yagsl-2026.10.03.json",
   "name": "YAGSL",
-  "version": "2026.9.17",
+  "version": "2026.10.03",
   "frcYear": "2026",
   "uuid": "1ccce5a4-acd2-4d18-bca3-4b8047188400",
   "mavenUrls": [
@@ -13,7 +13,7 @@
     {
       "groupId": "swervelib",
       "artifactId": "YAGSL-java",
-      "version": "2026.9.17"
+      "version": "2026.10.03"
     }
   ],
   "requires": [
@@ -26,8 +26,8 @@
     {
       "uuid": "cb311d09-36e9-4143-a032-55bb2b94443b",
       "errorMessage": "Studica is required!",
-      "offlineFileName": "StudicaLib.json",
-      "onlineUrl": "https://dev.studica.com/maven/release/2026/json/StudicaLib-2026.0.1-beta.json"
+      "offlineFileName": "Studica.json",
+      "onlineUrl": "https://dev.studica.com/maven/release/2026/json/Studica-2026.0.0.json"
     }
   ],
   "jniDependencies": [],
