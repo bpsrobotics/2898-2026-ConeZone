@@ -8,6 +8,8 @@ import edu.wpi.first.networktables.NetworkTableInstance
 import edu.wpi.first.networktables.StringPublisher
 import edu.wpi.first.wpilibj.DriverStation
 import edu.wpi.first.wpilibj.Filesystem
+import edu.wpi.first.wpilibj2.command.Command
+import edu.wpi.first.wpilibj2.command.Commands
 import edu.wpi.first.wpilibj2.command.SubsystemBase
 import frc.robot.utils.DashboardBoolean
 import frc.robot.utils.degrees
@@ -18,6 +20,25 @@ import org.photonvision.PhotonPoseEstimator
 import org.photonvision.targeting.PhotonPipelineResult
 
 object Vision : SubsystemBase() {
+    /**
+     * Pipelines on the [coneCamera]. Indices must match the PhotonVision UI, and every color
+     * pipeline must sort its targets largest-first.
+     */
+    enum class ConePipeline(val index: Int) {
+        RED(0),
+        BLUE(1),
+        WHITE(2),
+        DRIVER(3);
+
+        companion object {
+            fun forAlliance(alliance: DriverStation.Alliance): ConePipeline =
+                when (alliance) {
+                    DriverStation.Alliance.Red -> RED
+                    else -> BLUE
+                }
+        }
+    }
+
     /** A single PhotonVision camera and its pose estimator. */
     class Camera
     internal constructor(
@@ -49,6 +70,21 @@ object Vision : SubsystemBase() {
         }
     }
 
+    /** The AR0234 color camera: three cone-detection pipelines plus a driver feed. */
+    class ConeCamera internal constructor(val name: String, private val cam: PhotonCamera) {
+        val isConnected: Boolean
+            get() = cam.isConnected
+
+        val results: List<PhotonPipelineResult>
+            get() = cam.allUnreadResults
+
+        var pipeline: ConePipeline = ConePipeline.DRIVER
+            set(value) {
+                field = value
+                cam.setPipelineIndex(value.index)
+            }
+    }
+
     /** Disposable handle for a result subscription; call [close] to unsubscribe. */
     class Subscription internal constructor(private val onClose: () -> Unit) : AutoCloseable {
         override fun close() = onClose()
@@ -78,6 +114,7 @@ object Vision : SubsystemBase() {
     var enabled: Boolean by DashboardBoolean(true, "Vision")
 
     private val resultSubscribers = mutableListOf<(PhotonPipelineResult, Camera) -> Unit>()
+    private val coneResultSubscribers = mutableListOf<(PhotonPipelineResult, ConeCamera) -> Unit>()
 
     private val fieldLayout: AprilTagFieldLayout? =
         try {
@@ -114,7 +151,21 @@ object Vision : SubsystemBase() {
             )
         } ?: emptyList()
 
+    /** The AR0234 cone/driver camera; `null` if it failed to initialize. */
+    private val coneCamera: ConeCamera? = createConeCamera("AR0234")
+
+    /**
+     * The active cone-camera pipeline. Defaults to [ConePipeline.DRIVER] and can be switched at
+     * runtime by commands.
+     */
+    var pipeline: ConePipeline
+        get() = coneCamera?.pipeline ?: ConePipeline.DRIVER
+        set(value) {
+            coneCamera?.pipeline = value
+        }
+
     init {
+        pipeline = ConePipeline.DRIVER
         updateState()
         registerHealth()
     }
@@ -128,6 +179,11 @@ object Vision : SubsystemBase() {
                 for (subscriber in resultSubscribers) subscriber(result, camera)
             }
         }
+        coneCamera?.let { camera ->
+            for (result in camera.results) {
+                for (subscriber in coneResultSubscribers) subscriber(result, camera)
+            }
+        }
     }
 
     /** Registers a handler to run for every camera result. */
@@ -135,6 +191,16 @@ object Vision : SubsystemBase() {
         resultSubscribers += handler
         return Subscription { resultSubscribers -= handler }
     }
+
+    /** Registers a handler to run for every cone-camera result. */
+    fun onConeResult(handler: (PhotonPipelineResult, ConeCamera) -> Unit): Subscription {
+        coneResultSubscribers += handler
+        return Subscription { coneResultSubscribers -= handler }
+    }
+
+    /** Command that switches the cone camera to [selected] until another selection replaces it. */
+    fun selectPipeline(selected: ConePipeline): Command =
+        Commands.runOnce({ pipeline = selected }, this)
 
     /** Updates the reference pose used by each camera's fallback pose strategy. */
     fun setAllCameraReferences(pose: Pose3d) {
@@ -153,6 +219,15 @@ object Vision : SubsystemBase() {
                 PhotonCamera(name),
                 PhotonPoseEstimator(layout, robotToCamera),
             )
+        } catch (e: Exception) {
+            failedCameras += name
+            reportProblem("Failed to initialize camera '$name'", e)
+            null
+        }
+
+    private fun createConeCamera(name: String): ConeCamera? =
+        try {
+            ConeCamera(name, PhotonCamera(name))
         } catch (e: Exception) {
             failedCameras += name
             reportProblem("Failed to initialize camera '$name'", e)
@@ -189,7 +264,7 @@ object Vision : SubsystemBase() {
                             Alerts.Level.ERROR,
                         )
                     }
-                cameras.isEmpty() ->
+                cameras.isEmpty() && coneCamera == null ->
                     listOf(Alerts.Alert("Vision", "no cameras configured", Alerts.Level.ERROR))
                 else -> emptyList()
             }
@@ -200,14 +275,23 @@ object Vision : SubsystemBase() {
                 isConnected = { camera.isConnected },
             )
         }
+        coneCamera?.let { camera ->
+            Alerts.registerConnectedSensor(
+                "Vision/${camera.name}",
+                isConnected = { camera.isConnected },
+            )
+        }
     }
 
     private fun updateState() {
-        val disconnected = cameras.filterNot { it.isConnected }.map { it.name }
+        val disconnected = buildList {
+            cameras.filterNot { it.isConnected }.mapTo(this) { it.name }
+            coneCamera?.takeUnless { it.isConnected }?.let { add(it.name) }
+        }
         statePublisher.set(
             when {
                 failedCameras.isNotEmpty() -> "ERROR: ${failedCameras.sorted().joinToString()}"
-                cameras.isEmpty() -> "NO CAMERAS"
+                cameras.isEmpty() && coneCamera == null -> "NO CAMERAS"
                 disconnected.isEmpty() -> "OK"
                 else -> "MISSING: ${disconnected.sorted().joinToString()}"
             }

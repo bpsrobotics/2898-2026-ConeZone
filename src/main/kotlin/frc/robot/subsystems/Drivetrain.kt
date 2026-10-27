@@ -13,7 +13,6 @@ import edu.wpi.first.networktables.StructArrayPublisher
 import edu.wpi.first.networktables.StructPublisher
 import edu.wpi.first.units.Units
 import edu.wpi.first.units.measure.Angle
-import edu.wpi.first.wpilibj.DriverStation
 import edu.wpi.first.wpilibj.Filesystem
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard
 import edu.wpi.first.wpilibj2.command.Command
@@ -31,7 +30,6 @@ import frc.robot.utils.inches
 import frc.robot.utils.radiansPerSecond
 import frc.robot.utils.unwrappedDeviceAlerts
 import java.io.File
-import kotlin.jvm.optionals.getOrNull
 import kotlin.math.PI
 import swervelib.parser.SwerveParser
 import yams.mechanisms.config.SwerveDriveConfig
@@ -59,9 +57,6 @@ object Drivetrain : SubsystemBase() {
             )
         // YAGSL `File` Configs
         val DRIVE_CONFIG: File = File(Filesystem.getDeployDirectory(), "swerve1")
-
-        val ROBOT_WIDTH = 29.inches
-        // val BUMPER_WIDTH = 35.inches
     }
 
     /**
@@ -173,9 +168,6 @@ object Drivetrain : SubsystemBase() {
         SmartDashboard.putNumber("Odometry/HEADING", pose.rotation.radians)
     }
 
-    fun getAlliance(): DriverStation.Alliance =
-        DriverStation.getAlliance().getOrNull() ?: DriverStation.Alliance.Blue
-
     /**
      * Drives field-oriented speeds. Field-oriented is always field-oriented: this never silently
      * degrades to robot-oriented. Callers that need a trustworthy heading must check
@@ -210,8 +202,9 @@ object Drivetrain : SubsystemBase() {
      *
      * @param speeds supplier of the desired field-oriented speeds, polled every cycle.
      */
-    fun driveLive(speeds: () -> ChassisSpeeds): Command =
-        Commands.run({ driveFieldOriented(speeds()) }, this).until { !fieldOrientedAvailable }
+    fun driveLive(speeds: () -> ChassisSpeeds): Command = run {
+        driveFieldOriented(speeds())
+    }.until { !fieldOrientedAvailable }
 
     /**
      * Live command that drives robot-oriented [ChassisSpeeds] from a supplier. Requires the
@@ -219,8 +212,9 @@ object Drivetrain : SubsystemBase() {
      *
      * @param speeds supplier of the desired robot-oriented speeds, polled every cycle.
      */
-    fun driveLiveRobotOriented(speeds: () -> ChassisSpeeds): Command =
-        Commands.run({ driveRobotOriented(speeds()) }, this)
+    fun driveLiveRobotOriented(speeds: () -> ChassisSpeeds): Command = run {
+        driveRobotOriented(speeds())
+    }
 
     /**
      * Generic WPILib SysId routine for the drive motors.
@@ -301,7 +295,7 @@ object Drivetrain : SubsystemBase() {
      * Runs quasistatic forward/reverse then dynamic forward/reverse with settle delays, mirroring
      * the old `SwerveDriveTest.generateSysIdCommand(routine, 3.0, 5.0, 3.0)` timings. Stops the
      * drive closed-loop controllers for the run (required by YAMS before out-of-band `setVoltage`)
-     * and restarts them afterwards.
+     * and restarts them afterward.
      *
      * @param spin if true, aligns modules tangentially so the robot spins in place (old
      *   `testWithSpinning` behavior) instead of driving in a straight line.
@@ -465,7 +459,7 @@ object Drivetrain : SubsystemBase() {
     val robotVelocity: ChassisSpeeds
         get() = swerveDrive.robotRelativeSpeed
 
-    /** Method to toggle the lock position of the swerve drive to prevent motion. */
+    /** Method to enable the lock position of the swerve drive to prevent motion. */
     fun lock() {
         if (!enabled) return
         swerveDrive.lockPose()

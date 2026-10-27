@@ -27,6 +27,7 @@ import frc.robot.utils.asMeters
 import frc.robot.utils.controls.PIDConstants
 import frc.robot.utils.controls.PathPlannerPID
 import frc.robot.utils.convert
+import frc.robot.utils.getAlliance
 import frc.robot.utils.inches
 import frc.robot.utils.lbs
 import frc.robot.utils.metersPerSecond
@@ -95,7 +96,7 @@ object Autos {
                 Constants.rotationPIDConstants.PathPlannerPID,
             ),
             Constants.robotConfig,
-            { Drivetrain.getAlliance() == DriverStation.Alliance.Red },
+            { getAlliance() == DriverStation.Alliance.Red },
             Drivetrain, // Reference to this subsystem to set requirements
         )
     }

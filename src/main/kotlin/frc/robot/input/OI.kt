@@ -1,7 +1,6 @@
 package frc.robot.input
 
 import edu.wpi.first.math.MathUtil
-import edu.wpi.first.units.Units
 import edu.wpi.first.units.measure.Time
 import edu.wpi.first.wpilibj.DriverStation
 import edu.wpi.first.wpilibj.GenericHID
@@ -15,20 +14,14 @@ import edu.wpi.first.wpilibj2.command.button.Trigger
 import frc.robot.commands.swerve.DriveManager
 import frc.robot.input.OI.process
 import frc.robot.subsystems.Drivetrain
-import frc.robot.utils.DashboardMeasure
 import frc.robot.utils.asSeconds
+import frc.robot.utils.getAlliance
 import frc.robot.utils.sec
 import kotlin.math.absoluteValue
 import kotlin.math.pow
 import kotlin.math.sign
 
-/**
- * The Operating Interface object. This is where you put joystick, button, or keyboard inputs.
- *
- * A note about delegated properties, which are used in this object: A delegated property is where
- * getting (or setting) a field is outsourced to another object. Then, whenever you read the
- * property, it asks the object the property is delegated to for the value.
- */
+/** The Operating Interface object. This is where you put joystick, button, or keyboard inputs. */
 object OI : SubsystemBase() {
     object Constants {
         const val DRIVER_CONTROLLER_PORT = 0
@@ -40,15 +33,7 @@ object OI : SubsystemBase() {
     }
 
     val reverseDrive
-        get() =
-            if (
-                DriverStation.getAlliance().orElse(DriverStation.Alliance.Red) ==
-                    DriverStation.Alliance.Red
-            ) {
-                1.0
-            } else {
-                -1.0
-            }
+        get() = if (getAlliance() == DriverStation.Alliance.Red) 1.0 else -1.0
 
     val driveManager = DriveManager()
 
@@ -97,8 +82,7 @@ object OI : SubsystemBase() {
 
         if (power != 1.0) {
             // To keep the signage for output, we multiply by sign(output). This keeps negative
-            // inputs
-            // resulting in negative outputs.
+            // inputs resulting in negative outputs.
             output = output.absoluteValue.pow(power) * sign(output)
         }
 
@@ -113,9 +97,9 @@ object OI : SubsystemBase() {
     val driverController = CommandXboxController(Constants.DRIVER_CONTROLLER_PORT)
     val operatorController = CommandJoystick(Constants.OPERATOR_CONTROLLER_PORT)
 
-    // Right joystick y-axis.  Controller mapping can be tricky, the best way is to use the driver
-    // station to see what buttons and axis are being pressed.
-    // Squared for better control on turn, cubed on throttle
+    // Right joystick y-axis. Controller mapping can be tricky, the best way is to use the driver
+    // station to see what buttons and axis are being pressed. Squared for better control on turn,
+    // cubed on throttle
     /**
      * Driver controller's throttle on the left joystick for the X Axis, from -1 (left) to 1 (right)
      */
@@ -155,26 +139,26 @@ object OI : SubsystemBase() {
     fun rumble(side: GenericHID.RumbleType, power: Double, time: Time): Command =
         rumble(side, power).withTimeout(time.asSeconds)
 
-    /** Seconds each side stays on in [gyroFallbackRumble]'s left-right alternation. */
-    private var fallbackRumbleHalfPeriod: Time by DashboardMeasure(Units.Seconds, 0.25.sec, "OI")
-
     /**
      * Heavy alternating left-right rumble that runs until interrupted. Scheduled while the gyro is
      * untrustworthy so the driver feels teleop drop to robot-oriented. Preempts the idle no-rumble
      * default command and silences the controller on end.
      */
-    fun gyroFallbackRumble(): Command =
+    fun alternatingRumble(
+        onWeight: Double = 1.0,
+        offWeight: Double = 0.0,
+        halfPeriod: Time = 0.25.sec,
+    ): Command =
         runEnd(
             {
-                val leftOn =
-                    (Timer.getFPGATimestamp() / fallbackRumbleHalfPeriod.asSeconds).toInt() % 2 == 0
+                val leftOn = (Timer.getFPGATimestamp() / halfPeriod.asSeconds).toInt() % 2 == 0
                 driverController.setRumble(
                     GenericHID.RumbleType.kLeftRumble,
-                    if (leftOn) 1.0 else 0.0,
+                    if (leftOn) onWeight else offWeight,
                 )
                 driverController.setRumble(
                     GenericHID.RumbleType.kRightRumble,
-                    if (leftOn) 0.0 else 1.0,
+                    if (leftOn) offWeight else onWeight,
                 )
             },
             { driverController.setRumble(GenericHID.RumbleType.kBothRumble, 0.0) },

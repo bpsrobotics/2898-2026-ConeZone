@@ -14,10 +14,10 @@ import frc.robot.utils.sec
 
 /**
  * Hold-to-confirm gyro reset, bound to [OI.resetGyro].
- * - If vision odometry is on at press time, the hold is long ([longHold]) and firing also turns the
- *   YAGSL vision feed off, leaving odometry relative to the zeroed heading for the rest of the
- *   match. Full vision stays alive: tag-relative aligners don't need the field frame, so the driver
- *   simply doesn't call them.
+ * - If vision odometry is on at press time, the hold is long ([longHold]) and firing also turns off
+ *   YAGSL vision pose estimation, leaving odometry relative to the zeroed heading for the rest of
+ *   the match. Full vision stays alive: tag-relative aligners don't need the field frame, so the
+ *   driver simply doesn't call them.
  * - If the feed is already off (or never worked), the hold is short ([shortHold]) and firing just
  *   re-zeroes the gyro.
  *
@@ -31,8 +31,9 @@ class ResetGyroHold : Command() {
     /** True when the vision feed is on at press time, so firing also disables it. */
     private var disablesVision = true
 
-    private var longHold: Time by DashboardMeasure(Units.Seconds, 2.0.sec, "ResetGyroHold")
-    private var shortHold: Time by DashboardMeasure(Units.Seconds, 0.5.sec, "ResetGyroHold")
+    private val longHold: Time by DashboardMeasure(Units.Seconds, 2.0.sec, "ResetGyroHold")
+    private val shortHold: Time by DashboardMeasure(Units.Seconds, 0.5.sec, "ResetGyroHold")
+    private val firedTime: Time by DashboardMeasure(Units.Seconds, 0.2.sec, "ResetGyroHold")
 
     init {
         addRequirements(OI)
@@ -53,12 +54,15 @@ class ResetGyroHold : Command() {
             if (disablesVision) Vision.enablePoseEstimation = false
             Drivetrain.zeroGyro()
         }
-        OI.driverController.setRumble(GenericHID.RumbleType.kBothRumble, if (fired) 0.6 else 0.15)
+        OI.driverController.setRumble(
+            GenericHID.RumbleType.kBothRumble,
+            if (fired) 0.6 else if (disablesVision) 0.15 else 0.0,
+        )
     }
 
     override fun isFinished(): Boolean {
-        // Give an extra 0.2 seconds for the "finished" vibration
-        return timer.hasElapsed(threshold.asSeconds + 0.2)
+        // Give some extra time for the "finished" vibration
+        return timer.hasElapsed(threshold + firedTime)
     }
 
     override fun end(interrupted: Boolean) {
