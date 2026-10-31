@@ -41,13 +41,16 @@ fun OI.driverAndOperatorBindings() {
         .b()
         .or(driverController.y())
         .whileTrue(
-            alignCone({
-                if (driverController.y().asBoolean) {
-                    if (driverController.b().asBoolean)
-                        Vision.ConePipeline.forAlliance(getAlliance())
-                    else Vision.ConePipeline.WHITE
-                } else Vision.ConePipeline.forAlliance(getAlliance().opposite())
-            })
+            alignCone(
+                {
+                    if (!driverController.y().asBoolean) {
+                        if (driverController.b().asBoolean)
+                            Vision.ConePipeline.forAlliance(getAlliance())
+                        else Vision.ConePipeline.WHITE
+                    } else Vision.ConePipeline.forAlliance(getAlliance().opposite())
+                },
+                { slowFactor },
+            )
         )
 
     // Gyro untrustworthy in teleop: DriveManager drops teleop to robot-oriented, so shake the

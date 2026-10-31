@@ -11,6 +11,8 @@ import edu.wpi.first.wpilibj.Filesystem
 import edu.wpi.first.wpilibj2.command.Command
 import edu.wpi.first.wpilibj2.command.Commands
 import edu.wpi.first.wpilibj2.command.SubsystemBase
+import edu.wpi.first.wpilibj2.command.WaitCommand
+import frc.robot.subsystems.Vision.coneCamera
 import frc.robot.utils.DashboardBoolean
 import frc.robot.utils.degrees
 import frc.robot.utils.inches
@@ -152,7 +154,7 @@ object Vision : SubsystemBase() {
         } ?: emptyList()
 
     /** The AR0234 cone/driver camera; `null` if it failed to initialize. */
-    private val coneCamera: ConeCamera? = createConeCamera("AR0234")
+    private val coneCamera: ConeCamera? = createConeCamera("AR0234_Camera")
 
     /**
      * The active cone-camera pipeline. Defaults to [ConePipeline.DRIVER] and can be switched at
@@ -168,6 +170,7 @@ object Vision : SubsystemBase() {
         pipeline = ConePipeline.DRIVER
         updateState()
         registerHealth()
+        defaultCommand = WaitCommand(0.25).andThen(run { pipeline = ConePipeline.DRIVER })
     }
 
     override fun periodic() {

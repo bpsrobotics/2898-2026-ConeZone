@@ -128,6 +128,9 @@ object OI : SubsystemBase() {
     val highHatBack: Trigger = operatorController.pov(180)
     val operatorTrigger: Trigger = operatorController.trigger()
 
+    val slowFactor: Double
+        get() = 1.0 - (rightTrigger.pow(3) * 0.8)
+
     /** Rumbles the driver controller continuously until interrupted. */
     fun rumble(side: GenericHID.RumbleType, power: Double): Command =
         runEnd(
