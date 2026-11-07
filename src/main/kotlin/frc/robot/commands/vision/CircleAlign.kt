@@ -1,7 +1,6 @@
 package frc.robot.commands.vision
 
 import edu.wpi.first.math.MathUtil
-import edu.wpi.first.math.controller.PIDController
 import edu.wpi.first.math.geometry.Pose2d
 import edu.wpi.first.math.geometry.Translation2d
 import edu.wpi.first.math.kinematics.ChassisSpeeds
@@ -14,6 +13,7 @@ import frc.robot.subsystems.Drivetrain
 import frc.robot.utils.angleTo
 import frc.robot.utils.asMeters
 import frc.robot.utils.asRadians
+import frc.robot.utils.controls.toPID
 import frc.robot.utils.convert
 import frc.robot.utils.degrees
 import kotlin.math.absoluteValue
@@ -21,9 +21,9 @@ import kotlin.math.cos
 import kotlin.math.sign
 import kotlin.math.sin
 
-private val circleAlignCirclePID = PIDController(4.0, 0.3, 0.1)
-private val circleAlignDistancePID = PIDController(2.0, 0.3, 0.1)
-private val circleAlignRotationPID = PIDController(3.0, 0.1, 0.1)
+private val circleAlignCirclePID = Drivetrain.Constants.TRANSLATION_PID.toPID()
+private val circleAlignDistancePID = Drivetrain.Constants.TRANSLATION_PID.toPID()
+private val circleAlignRotationPID = Drivetrain.Constants.ROTATION_PID.toPID()
 
 /**
  * Auto-mode aligner that orbits [targetCenter] at [desiredDistance] while holding the heading from

@@ -1,5 +1,6 @@
 package frc.robot.commands.swerve
 
+import edu.wpi.first.math.geometry.Translation2d
 import edu.wpi.first.units.measure.AngularVelocity
 import edu.wpi.first.units.measure.LinearVelocity
 import frc.robot.subsystems.Drivetrain
@@ -22,6 +23,7 @@ class TeleopDrive(
     private val getVStrafe: () -> Double,
     private val getOmega: () -> Double,
     private val slowMode: () -> Double,
+    private val robotOriented: () -> Boolean,
 ) : DriveManager.DriveRequestBase() {
     override var vx: LinearVelocity? = 0.0.metersPerSecond
     override var vy: LinearVelocity? = 0.0.metersPerSecond
@@ -40,12 +42,14 @@ class TeleopDrive(
         angVelocity = getOmega()
         slowModeCalc = slowMode()
 
-        forwardVelocity *= (1.0 - (slowModeCalc.pow(3) * 0.8))
-        strafeVelocity *= (1.0 - (slowModeCalc.pow(3) * 0.8))
+        var translation = Translation2d(forwardVelocity, strafeVelocity)
+        if (robotOriented()) translation.rotateBy(Drivetrain.pose.rotation)
+
+        translation *= (1.0 - (slowModeCalc.pow(3) * 0.8))
         angVelocity *= (1.0 - (slowModeCalc.pow(3) * 0.85))
 
-        vx = Drivetrain.Constants.MAX_SPEED * forwardVelocity
-        vy = Drivetrain.Constants.MAX_SPEED * strafeVelocity
+        vx = Drivetrain.Constants.MAX_SPEED * translation.x
+        vy = Drivetrain.Constants.MAX_SPEED * translation.y
         omega = Drivetrain.Constants.MAX_ANGULAR_SPEED * angVelocity
     }
 }

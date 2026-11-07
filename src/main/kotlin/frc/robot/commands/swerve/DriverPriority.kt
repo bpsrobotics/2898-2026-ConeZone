@@ -4,4 +4,5 @@ enum class DriverPriority {
     BASE_TELEOP,
     MOVE_TO,
     CARDINAL_ALIGN,
+    HOLD_ANGLE,
 }

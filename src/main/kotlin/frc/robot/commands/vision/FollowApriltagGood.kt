@@ -1,6 +1,5 @@
 package frc.robot.commands.vision
 
-import edu.wpi.first.math.controller.PIDController
 import edu.wpi.first.math.geometry.Translation2d
 import edu.wpi.first.math.kinematics.ChassisSpeeds
 import edu.wpi.first.wpilibj.Timer
@@ -9,14 +8,15 @@ import edu.wpi.first.wpilibj2.command.Command
 import frc.robot.subsystems.Drivetrain
 import frc.robot.subsystems.Vision
 import frc.robot.utils.asRadians
+import frc.robot.utils.controls.toPID
 import frc.robot.utils.degrees
 import frc.robot.utils.polarTranslation
 import frc.robot.utils.radians
+import org.photonvision.targeting.PhotonTrackedTarget
 import kotlin.math.absoluteValue
 import kotlin.math.cos
 import kotlin.math.sign
 import kotlin.math.sin
-import org.photonvision.targeting.PhotonTrackedTarget
 
 /**
  * Auto-mode aligner that drives robot-oriented speeds to hold [xToTag]/[yToTag] offsets from an
@@ -24,9 +24,9 @@ import org.photonvision.targeting.PhotonTrackedTarget
  */
 fun followApriltagGood(apriltagId: Int, yToTag: Double = 0.0, xToTag: Double = 1.0): Command {
     val timer = Timer()
-    val xPID = PIDController(2.0, 0.1, 0.1)
-    val yPID = PIDController(2.0, 0.1, 0.1)
-    val rotationPID = PIDController(2.0, 0.2, 0.0)
+    val xPID = Drivetrain.Constants.TRANSLATION_PID.toPID()
+    val yPID = Drivetrain.Constants.TRANSLATION_PID.toPID()
+    val rotationPID = Drivetrain.Constants.ROTATION_PID.toPID()
     rotationPID.enableContinuousInput(-180.degrees.asRadians, 180.degrees.asRadians)
 
     var subscription: Vision.Subscription? = null

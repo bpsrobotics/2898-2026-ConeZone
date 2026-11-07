@@ -1,19 +1,19 @@
 package frc.robot.commands.vision
 
-import edu.wpi.first.math.controller.PIDController
 import edu.wpi.first.math.geometry.Pose2d
 import edu.wpi.first.math.kinematics.ChassisSpeeds
 import edu.wpi.first.networktables.NetworkTableInstance
 import edu.wpi.first.wpilibj2.command.Command
 import frc.robot.subsystems.Drivetrain
 import frc.robot.utils.asRadians
+import frc.robot.utils.controls.toPID
 import frc.robot.utils.degrees
 import frc.robot.utils.unit
 import kotlin.math.absoluteValue
 import kotlin.math.sign
 
-private val alignOdometryContinuousTranslationPID = PIDController(2.0, 0.3, 0.1)
-private val alignOdometryContinuousRotationPID = PIDController(3.0, 0.1, 0.1)
+private val alignOdometryContinuousTranslationPID = Drivetrain.Constants.TRANSLATION_PID.toPID()
+private val alignOdometryContinuousRotationPID = Drivetrain.Constants.ROTATION_PID.toPID()
 private const val alignOdometryContinuousDeadzone = 0.003
 private const val alignOdometryContinuousKs = 0.05
 

@@ -20,6 +20,9 @@ object FieldMapConeZone {
     /** Physical size of the AprilTags on the field (6.5" black square, 36h11 family). */
     val tagSize: Distance = 6.5.inches
 
+    /** Half of the 15" tower footprint, i.e. the distance from a tag to the tower center. */
+    val towerHalfWidth: Distance = 7.5.inches
+
     /** Tag IDs on the tower stations (full-size robot scoring locations). */
     val towerTagIds = 1..8
 

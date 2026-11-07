@@ -23,24 +23,28 @@ import frc.robot.subsystems.Drivetrain.driveSysIdRoutine
 import frc.robot.utils.DashboardBoolean
 import frc.robot.utils.asMeters
 import frc.robot.utils.clearUnwrappedDevice
+import frc.robot.utils.controls.PIDConstants
 import frc.robot.utils.degrees
 import frc.robot.utils.degreesPerSecond
 import frc.robot.utils.feetPerSecond
 import frc.robot.utils.inches
 import frc.robot.utils.radiansPerSecond
 import frc.robot.utils.unwrappedDeviceAlerts
-import java.io.File
-import kotlin.math.PI
 import swervelib.parser.SwerveParser
 import yams.mechanisms.config.SwerveDriveConfig
 import yams.mechanisms.swerve.SwerveDrive
 import yams.motorcontrollers.SmartMotorControllerConfig.TelemetryVerbosity
 import yams.telemetry.SwerveDriveTelemetryConfig
+import java.io.File
+import kotlin.math.PI
 
 object Drivetrain : SubsystemBase() {
     object Constants {
         val MAX_SPEED = 15.1.feetPerSecond
         val MAX_ANGULAR_SPEED = PI.radiansPerSecond
+
+        val TRANSLATION_PID = PIDConstants(2.0, 0.3, 0.1)
+        val ROTATION_PID = PIDConstants(2.0, 0.01, 0.2)
         // Chassis configuration (left to right dist of center of the wheels)
         private val TRACK_WIDTH = 11.5.inches.asMeters
 
@@ -204,7 +208,8 @@ object Drivetrain : SubsystemBase() {
      */
     fun driveLive(speeds: () -> ChassisSpeeds): Command = run {
         driveFieldOriented(speeds())
-    }.until { !fieldOrientedAvailable }
+    }
+        .until { !fieldOrientedAvailable }
 
     /**
      * Live command that drives robot-oriented [ChassisSpeeds] from a supplier. Requires the

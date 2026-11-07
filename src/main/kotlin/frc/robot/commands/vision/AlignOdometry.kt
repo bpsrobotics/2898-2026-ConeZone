@@ -1,7 +1,6 @@
 package frc.robot.commands.vision
 
 import edu.wpi.first.math.MathUtil
-import edu.wpi.first.math.controller.PIDController
 import edu.wpi.first.math.geometry.Pose2d
 import edu.wpi.first.math.geometry.Rotation2d
 import edu.wpi.first.math.kinematics.ChassisSpeeds
@@ -9,13 +8,14 @@ import edu.wpi.first.networktables.NetworkTableInstance
 import edu.wpi.first.wpilibj2.command.Command
 import frc.robot.subsystems.Drivetrain
 import frc.robot.utils.asRadians
+import frc.robot.utils.controls.toPID
 import frc.robot.utils.degrees
 import kotlin.math.absoluteValue
 import kotlin.math.sign
 
-private val alignOdometryYPID = PIDController(2.0, 0.3, 0.1)
-private val alignOdometryXPID = PIDController(2.0, 0.3, 0.1)
-private val alignOdometryRotationPID = PIDController(3.0, 0.1, 0.1)
+private val alignOdometryYPID = Drivetrain.Constants.TRANSLATION_PID.toPID()
+private val alignOdometryXPID = Drivetrain.Constants.TRANSLATION_PID.toPID()
+private val alignOdometryRotationPID = Drivetrain.Constants.ROTATION_PID.toPID()
 
 // 3, 3.2
 /**

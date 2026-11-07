@@ -3,9 +3,11 @@ package frc.robot.input
 import edu.wpi.first.wpilibj.DriverStation
 import edu.wpi.first.wpilibj2.command.button.Trigger
 import frc.robot.commands.swerve.CardinalAlign
+import frc.robot.commands.swerve.HoldAngle
 import frc.robot.commands.swerve.ResetGyroHold
 import frc.robot.commands.swerve.TeleopDrive
 import frc.robot.commands.vision.alignCone
+import frc.robot.commands.vision.towerAlign
 import frc.robot.subsystems.Drivetrain
 import frc.robot.subsystems.Vision
 import frc.robot.utils.degrees
@@ -13,7 +15,6 @@ import frc.robot.utils.getAlliance
 import frc.robot.utils.opposite
 import frc.robot.utils.sec
 
-@Suppress("Unused")
 fun OI.driverAndOperatorBindings() {
     // region Drivetrain
     // Hold to zero the gyro, with a firm rumble on fire. Usage while vision is enabled turns off
@@ -24,12 +25,27 @@ fun OI.driverAndOperatorBindings() {
     Drivetrain.defaultCommand =
         driveManager.alongWith(
             driveManager.defineDriver(
-                TeleopDrive({ -translationY }, { -translationX }, { -turn }, { rightTrigger })
+                TeleopDrive(
+                    { -translationY },
+                    { -translationX },
+                    { -turn },
+                    { rightTrigger },
+                    { driverController.leftStick().asBoolean },
+                )
             )
         )
 
     // Lock pose: put the wheels in an X shape to make it harder for other robots to move ours
     driverController.x().debounce(0.2).whileTrue(Drivetrain.run { Drivetrain.lock() })
+
+    // Tower align: hold A to approach the selected tower, orbit with left X, and adjust distance
+    // with left Y. The robot keeps facing the tower.
+    driverController
+        .a()
+        .whileTrue(towerAlign({ translationX }, { -translationY }, { rightTrigger }))
+
+    // Hold angle: use PID to keep the robot at the same angle while right stick is clicked
+    driverController.rightStick().whileTrue(driveManager.defineDriver(HoldAngle()))
 
     /**
      * B and Y: Cone alignment

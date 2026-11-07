@@ -1,8 +1,8 @@
 package frc.robot.commands.swerve
 
-import edu.wpi.first.math.controller.PIDController
 import edu.wpi.first.units.measure.Angle
 import frc.robot.subsystems.Drivetrain
+import frc.robot.utils.controls.toPID
 import frc.robot.utils.convert
 import frc.robot.utils.radiansPerSecond
 import kotlin.math.PI
@@ -10,7 +10,7 @@ import kotlin.math.PI
 class CardinalAlign(val getTargetAngle: () -> Angle) : DriveManager.DriveRequestBase() {
     override val priority: Int = DriverPriority.CARDINAL_ALIGN.ordinal
 
-    private val rotationPID = PIDController(2.0, 0.01, 0.2)
+    private val rotationPID = Drivetrain.Constants.ROTATION_PID.toPID()
 
     init {
         rotationPID.enableContinuousInput(-PI, PI)

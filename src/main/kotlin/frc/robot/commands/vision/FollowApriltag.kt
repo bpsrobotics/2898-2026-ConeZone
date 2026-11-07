@@ -21,7 +21,7 @@ fun followApriltag(apriltagId: Int): Command {
     fun computeSpeeds(): ChassisSpeeds {
         val tag = desiredTag ?: return ChassisSpeeds()
         val yawToTag = tag.bestCameraToTarget.rotation.z
-        val kp = -3.0
+        val kp = -Drivetrain.Constants.ROTATION_PID.p
         val error = Rotation2d.fromDegrees(180.0).minus(Rotation2d.fromRadians(yawToTag)).radians
         println(error)
 

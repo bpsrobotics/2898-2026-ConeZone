@@ -2,11 +2,11 @@ package frc.robot.utils
 
 import edu.wpi.first.networktables.NetworkTableEntry
 import edu.wpi.first.units.Measure
-import edu.wpi.first.units.Unit as WpiUnit
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty
+import edu.wpi.first.units.Unit as WpiUnit
 
 fun mergePaths(parent: String, prop: String): String = if (parent == "") prop else "$parent/$prop"
 
