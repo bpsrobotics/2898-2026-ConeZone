@@ -111,7 +111,10 @@ public class Elevator extends SubsystemBase {
         setPosition(scaled);
     }
 
-    /** Homes the elevator and resets encoder when plant triggers bottom limit switch. */
+    /**
+     * Homes the elevator and resets encoder when plant triggers bottom limit
+     * switch.
+     */
     public Command homeElevator() {
         return runOnce(
                 () -> {
