@@ -22,9 +22,8 @@ public class Elevator extends SubsystemBase {
 
     // Elevator motor configuration
     private final SparkMax leadMotor = new SparkMax(ELEVATOR_LEADER_MOTOR_ID, MotorType.kBrushless);
-    private final SparkMax followerMotorA = new SparkMax(FOLLOWER_MOTOR_IDS[0], MotorType.kBrushless);
-    private final SparkMax followerMotorB = new SparkMax(FOLLOWER_MOTOR_IDS[1], MotorType.kBrushless);
-    private final SparkMax followerMotorC = new SparkMax(FOLLOWER_MOTOR_IDS[2], MotorType.kBrushless);
+    private final SparkMax followerMotorA = new SparkMax(FOLLOWER_MOTOR_ID, MotorType.kBrushless);
+
     private final SparkMaxConfig followerConfig = new SparkMaxConfig();
     private final SparkMaxConfig resetConfig = new SparkMaxConfig();
     private final Encoder encoder = new Encoder(ENCODER_LA_ID, ENCODER_LB_ID);
@@ -39,13 +38,12 @@ public class Elevator extends SubsystemBase {
             kD,
             ELEVATOR_MOTION_CONSTRAINTS);
 
-    /** Invoke the rites of awakening for ascender. */
+    /** Invoke the rites of awakening for the ascender. */
     public Elevator() {
         encoder.setDistancePerPulse(ElevatorConstants.ENCODER_PPC);
         followerConfig.follow(ElevatorConstants.ELEVATOR_LEADER_MOTOR_ID);
         followerMotorA.configure(followerConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
-        followerMotorB.configure(followerConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
-        followerMotorC.configure(followerConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+
         resetConfig.idleMode(IdleMode.kBrake);
         resetConfig.smartCurrentLimit(40);
         resetConfig.voltageCompensation(12);
