@@ -95,9 +95,8 @@ object Drivetrain : SubsystemBase() {
     private val config: SwerveDriveConfig =
         SwerveDriveConfig()
             .withSubsystem(this)
-            // Negated: RIO is upside-down
-            .withGyro { -navX.angle.degrees }
-            .withGyroVelocity { -navX.rate.degreesPerSecond }
+            .withGyro { navX.angle.degrees }
+            .withGyroVelocity { navX.rate.degreesPerSecond }
             .withGyroInverted(false)
             // .withGyroOffset(...), .withGyroVelocity(...) are also available
             // these controllers are used in [SwerveDrive.driveToPose]:
@@ -313,10 +312,10 @@ object Drivetrain : SubsystemBase() {
                 Commands.runOnce(
                     { if (spin) alignModulesTangential() else alignModulesStraight() },
                     this,
-                )
+                ),
             )
             .andThen(
-                Commands.print("Waiting for wheels to align").andThen(Commands.waitSeconds(1.5))
+                Commands.print("Waiting for wheels to align").andThen(Commands.waitSeconds(1.5)),
             )
             .andThen(
                 Commands.runOnce(
@@ -326,14 +325,14 @@ object Drivetrain : SubsystemBase() {
                         }
                     },
                     this,
-                )
+                ),
             )
             .andThen(
-                driveSysIdRoutine.quasistatic(SysIdRoutine.Direction.kForward).withTimeout(5.0)
+                driveSysIdRoutine.quasistatic(SysIdRoutine.Direction.kForward).withTimeout(5.0),
             )
             .andThen(Commands.waitSeconds(3.0))
             .andThen(
-                driveSysIdRoutine.quasistatic(SysIdRoutine.Direction.kReverse).withTimeout(5.0)
+                driveSysIdRoutine.quasistatic(SysIdRoutine.Direction.kReverse).withTimeout(5.0),
             )
             .andThen(Commands.waitSeconds(3.0))
             .andThen(driveSysIdRoutine.dynamic(SysIdRoutine.Direction.kForward).withTimeout(3.0))
@@ -344,7 +343,7 @@ object Drivetrain : SubsystemBase() {
                     swerveDrive.modules.forEach {
                         it.driveMotorController.startClosedLoopController()
                     }
-                }
+                },
             )
             .andThen(Commands.print("Done with drive ${label}SysId!"))
     }
@@ -374,14 +373,14 @@ object Drivetrain : SubsystemBase() {
                         }
                     },
                     this,
-                )
+                ),
             )
             .andThen(
-                angleSysIdRoutine.quasistatic(SysIdRoutine.Direction.kForward).withTimeout(5.0)
+                angleSysIdRoutine.quasistatic(SysIdRoutine.Direction.kForward).withTimeout(5.0),
             )
             .andThen(Commands.waitSeconds(3.0))
             .andThen(
-                angleSysIdRoutine.quasistatic(SysIdRoutine.Direction.kReverse).withTimeout(5.0)
+                angleSysIdRoutine.quasistatic(SysIdRoutine.Direction.kReverse).withTimeout(5.0),
             )
             .andThen(Commands.waitSeconds(3.0))
             .andThen(angleSysIdRoutine.dynamic(SysIdRoutine.Direction.kForward).withTimeout(3.0))
@@ -392,7 +391,7 @@ object Drivetrain : SubsystemBase() {
                     swerveDrive.modules.forEach {
                         it.azimuthMotorController.startClosedLoopController()
                     }
-                }
+                },
             )
             .andThen(Commands.print("Done with azimuth SysId!"))
     }

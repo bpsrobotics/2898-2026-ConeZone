@@ -9,6 +9,7 @@ import frc.robot.commands.swerve.TeleopDrive
 import frc.robot.commands.vision.alignCone
 import frc.robot.commands.vision.towerAlign
 import frc.robot.subsystems.Drivetrain
+import frc.robot.subsystems.Intake
 import frc.robot.subsystems.Vision
 import frc.robot.utils.degrees
 import frc.robot.utils.getAlliance
@@ -31,8 +32,8 @@ fun OI.driverAndOperatorBindings() {
                     { -turn },
                     { rightTrigger },
                     { driverController.leftStick().asBoolean },
-                )
-            )
+                ),
+            ),
         )
 
     // Lock pose: put the wheels in an X shape to make it harder for other robots to move ours
@@ -66,7 +67,7 @@ fun OI.driverAndOperatorBindings() {
                     } else Vision.ConePipeline.forAlliance(getAlliance().opposite())
                 },
                 { slowFactor },
-            )
+            ),
         )
 
     // Gyro untrustworthy in teleop: DriveManager drops teleop to robot-oriented, so shake the
@@ -79,4 +80,11 @@ fun OI.driverAndOperatorBindings() {
         .whileTrue(driveManager.defineDriver(CardinalAlign { -driverController.hid.pov.degrees }))
 
     // endregion Drivetrain
+
+    // region Intake
+
+    operatorController.povUp().whileTrue(Intake.runIntake(1.0))
+    operatorController.povDown().whileTrue(Intake.runIntake(-1.0))
+
+    // endregion
 }

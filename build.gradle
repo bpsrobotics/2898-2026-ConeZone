@@ -110,3 +110,16 @@ tasks.withType(JavaCompile) {
 kotlin {
     jvmToolchain(17)
 }
+
+tasks.register('calibrateSwerveOffsets', JavaExec) {
+    group = 'robot'
+    description = 'Average raw swerve encoder readings from NetworkTables and update module offsets.'
+    dependsOn classes, extractReleaseNative
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'frc.robot.tools.CalibrateSwerveOffsetsKt'
+    systemProperty 'java.library.path', layout.buildDirectory.dir('jni/release').get().asFile.absolutePath
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
+    args((project.findProperty('robotHost') ?: '10.28.98.2').toString(),
+        (project.findProperty('sampleSeconds') ?: '5').toString(),
+        project.file('src/main/deploy/swerve1/modules').absolutePath)
+}
