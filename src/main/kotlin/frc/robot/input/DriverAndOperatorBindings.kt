@@ -8,8 +8,8 @@ import frc.robot.commands.swerve.ResetGyroHold
 import frc.robot.commands.swerve.TeleopDrive
 import frc.robot.commands.vision.alignCone
 import frc.robot.commands.vision.towerAlign
+import frc.robot.subsystems.Arm
 import frc.robot.subsystems.Drivetrain
-import frc.robot.subsystems.Intake
 import frc.robot.subsystems.Vision
 import frc.robot.utils.degrees
 import frc.robot.utils.getAlliance
@@ -81,10 +81,10 @@ fun OI.driverAndOperatorBindings() {
 
     // endregion Drivetrain
 
-    // region Intake
+    // region Arm
 
-    operatorController.povUp().whileTrue(Intake.runIntake(1.0))
-    operatorController.povDown().whileTrue(Intake.runIntake(-1.0))
+    operatorController.povUp().whileTrue(Arm.runIntake(1.0))
+    operatorController.povDown().whileTrue(Arm.runIntake(-1.0))
 
     // endregion
 }
