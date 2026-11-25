@@ -2,6 +2,7 @@ plugins {
     id "java"
     id "edu.wpi.first.GradleRIO" version "2026.2.1"
     id 'org.jetbrains.kotlin.jvm' version '2.2.20'
+    id "org.jetbrains.kotlin.kapt" version '2.2.20'
 }
 
 java {
@@ -75,6 +76,7 @@ dependencies {
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.1'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'org.jetbrains.kotlin:kotlin-test'
 }
 
 configurations {
@@ -143,4 +145,7 @@ tasks.register('saveElevatorGains', JavaExec) {
     jvmArgs '--enable-native-access=ALL-UNNAMED'
     args((project.findProperty('robotHost') ?: '10.28.98.2').toString(),
         project.file('src/main/kotlin').absolutePath)
+}
+repositories {
+    mavenCentral()
 }

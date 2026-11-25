@@ -5,6 +5,7 @@ import edu.wpi.first.hal.PowerDistributionStickyFaults
 import edu.wpi.first.networktables.DoubleArrayPublisher
 import edu.wpi.first.networktables.DoublePublisher
 import edu.wpi.first.networktables.NetworkTableInstance
+import edu.wpi.first.units.Units.Volts
 import edu.wpi.first.units.measure.Current
 import edu.wpi.first.units.measure.Power
 import edu.wpi.first.units.measure.Voltage
@@ -48,6 +49,7 @@ object PowerMonitor : SubsystemBase() {
 
     private val table = NetworkTableInstance.getDefault().getTable("PowerMonitor")
     private val voltagePublisher: DoublePublisher = table.getDoubleTopic("voltage").publish()
+    private val lowestVoltagePublisher: DoublePublisher = table.getDoubleTopic("lowestVoltage").publish()
     private val totalCurrentPublisher: DoublePublisher =
         table.getDoubleTopic("totalCurrent").publish()
     private val totalPowerPublisher: DoublePublisher = table.getDoubleTopic("totalPower").publish()
@@ -57,6 +59,10 @@ object PowerMonitor : SubsystemBase() {
     /** Battery voltage, or `null` when the monitor is off or the PDH is unreachable. */
     val voltage: Voltage?
         get() = livePdh()?.let { pdh -> runCatching { pdh.voltage.volts }.getOrNull() }
+
+    /** Lowest battery voltage since the last `clearFaults()`, or `null` when unavailable. */
+    var lowestVoltage: Voltage? = null
+        private set
 
     /** Sum of monitored channel currents, or `null` when unavailable. */
     val totalCurrent: Current?
@@ -89,11 +95,16 @@ object PowerMonitor : SubsystemBase() {
 
     override fun periodic() {
         val snap = readSnapshot()?.takeIf { isPlausible(it.voltageVolts) }
+        if (snap != null) {
+            val currentVoltage = snap.voltageVolts.volts
+            lowestVoltage = minOf(lowestVoltage ?: currentVoltage, currentVoltage)
+        }
         voltagePublisher.set(snap?.voltageVolts ?: Double.NaN)
         totalCurrentPublisher.set(snap?.totalCurrentAmps ?: Double.NaN)
         totalPowerPublisher.set(
             if (snap != null) snap.voltageVolts * snap.totalCurrentAmps else Double.NaN
         )
+        lowestVoltagePublisher.set(lowestVoltage?.`in`(Volts) ?: Double.NaN)
         channelsPublisher.set(snap?.currentsAmps ?: DoubleArray(0))
     }
 
@@ -106,6 +117,7 @@ object PowerMonitor : SubsystemBase() {
     }
 
     private fun clearFaults() {
+        lowestVoltage = null
         if (pdh == null) initPdh() else runCatching { pdh?.clearStickyFaults() }
     }
 
