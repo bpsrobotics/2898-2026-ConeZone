@@ -8,6 +8,7 @@ import frc.robot.input.OI
 import frc.robot.input.driverAndOperatorBindings
 import frc.robot.subsystems.Alerts
 import frc.robot.subsystems.Drivetrain
+import frc.robot.subsystems.Elevator
 import frc.robot.subsystems.PowerMonitor
 import frc.robot.subsystems.Vision
 
@@ -42,6 +43,7 @@ class RobotContainer {
     private fun initializeObjects() {
         Alerts
         Drivetrain
+        Elevator
         Vision
         PowerMonitor
     }

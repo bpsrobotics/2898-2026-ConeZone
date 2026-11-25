@@ -14,6 +14,13 @@ data class ArmFeedForwardConstants(
 
 data class PIDConstants(val p: Double, val i: Double, val d: Double)
 
+data class ElevatorFeedForwardConstants(
+    val kS: Double,
+    val kG: Double,
+    val kV: Double,
+    val kA: Double = 0.0,
+)
+
 fun SimpleMotorFeedForwardConstants.toFeedForward(): SimpleMotorFeedforward {
     return SimpleMotorFeedforward(this.kS, this.kV, this.kA)
 }

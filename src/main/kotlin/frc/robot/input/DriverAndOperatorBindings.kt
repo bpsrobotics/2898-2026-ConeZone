@@ -10,6 +10,7 @@ import frc.robot.commands.vision.alignCone
 import frc.robot.commands.vision.towerAlign
 import frc.robot.subsystems.Arm
 import frc.robot.subsystems.Drivetrain
+import frc.robot.subsystems.Elevator
 import frc.robot.subsystems.Vision
 import frc.robot.utils.degrees
 import frc.robot.utils.getAlliance
@@ -85,6 +86,19 @@ fun OI.driverAndOperatorBindings() {
 
     operatorController.povUp().whileTrue(Arm.runIntake(1.0))
     operatorController.povDown().whileTrue(Arm.runIntake(-1.0))
+    operatorController.button(5).whileTrue(Arm.runIntakeUntilPresent(1.0))
+    operatorController.button(3).whileTrue(Arm.runIntakeUntilGone(-1.0))
+
+    // endregion
+
+    // region Elevator
+
+    // Hold the trigger until the bottom switch is reached; releasing it aborts homing.
+    operatorController.button(7).whileTrue(Elevator.homeElevator())
+    operatorController.button(6).onTrue(Elevator.moveBy { Elevator.Constants.OPERATOR_STEP })
+    operatorController.button(4).onTrue(Elevator.moveBy { -Elevator.Constants.OPERATOR_STEP })
+    operatorController.button(8).onTrue(Elevator.moveTo { Elevator.Constants.MAX_HEIGHT })
+    operatorController.button(10).onTrue(Elevator.moveTo { Elevator.Constants.MIN_HEIGHT })
 
     // endregion
 }

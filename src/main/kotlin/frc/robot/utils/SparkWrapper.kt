@@ -5,9 +5,15 @@ import com.revrobotics.REVLibError
 import com.revrobotics.ResetMode
 import com.revrobotics.spark.SparkLowLevel.MotorType
 import com.revrobotics.spark.SparkMax
+import com.revrobotics.spark.config.SparkBaseConfig.IdleMode
 import com.revrobotics.spark.config.SparkMaxConfig
+import edu.wpi.first.units.Units.Rotations
+import edu.wpi.first.units.Units.RotationsPerSecond
+import edu.wpi.first.units.Units.MetersPerSecond
 import edu.wpi.first.units.measure.Angle
 import edu.wpi.first.units.measure.AngularVelocity
+import edu.wpi.first.units.measure.Distance
+import edu.wpi.first.units.measure.LinearVelocity
 import edu.wpi.first.util.sendable.Sendable
 import edu.wpi.first.util.sendable.SendableBuilder
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard
@@ -16,6 +22,8 @@ import frc.robot.subsystems.Alerts
 class SparkWrapper(
     val deviceId: Int,
     val motorType: MotorType,
+    /** Linear travel per reported encoder rotation, after any configured encoder scaling. */
+    val circumference: Distance? = null,
     configurer: SparkMaxConfig.() -> Unit,
 ) : Sendable, Alerts.Source {
     override val alertLabel: String = "Spark$deviceId"
@@ -35,7 +43,29 @@ class SparkWrapper(
      */
     @Suppress("MemberVisibilityCanBePrivate", "unused")
     val position: Angle?
-        get() = runCatching { motor?.encoder?.position?.rotations }.getOrNull()
+        get() = runCatching { motor?.encoder?.position?.takeIf(Double::isFinite)?.rotations }.getOrNull()
+
+    /**
+     * Travel from the encoder's zero point, or `null` without a circumference or encoder reading.
+     */
+    val distance: Distance?
+        get() = position?.let { angle -> circumference?.times(angle.convert(Rotations)) }
+
+    val encoder
+        get() = motor?.encoder
+
+    val idleMode: IdleMode?
+        get() = runCatching { motor?.configAccessor?.idleMode }.getOrNull()
+
+    /** Changes idle mode for this session without writing flash or resetting other settings. */
+    fun setTemporaryIdleMode(mode: IdleMode): Boolean {
+        val spark = motor ?: return false
+        return spark.configure(
+            SparkMaxConfig().idleMode(mode),
+            ResetMode.kNoResetSafeParameters,
+            PersistMode.kNoPersistParameters,
+        ) == REVLibError.kOk
+    }
 
     /**
      * Shaft velocity, or `null` when the controller is unreachable. Consumers must fall back or
@@ -43,7 +73,15 @@ class SparkWrapper(
      */
     @Suppress("MemberVisibilityCanBePrivate", "unused")
     val velocity: AngularVelocity?
-        get() = runCatching { motor?.encoder?.velocity?.RPM }.getOrNull()
+        get() = runCatching { motor?.encoder?.velocity?.takeIf(Double::isFinite)?.RPM }.getOrNull()
+
+    /** Linear speed from the same scaled encoder and circumference used by [distance]. */
+    val linearVelocity: LinearVelocity?
+        get() = velocity?.let { angularVelocity ->
+            circumference?.let { travel ->
+                MetersPerSecond.of(travel.asMeters * angularVelocity.convert(RotationsPerSecond))
+            }
+        }
 
     /** Output current in amps, or `null` when the controller is unreachable. */
     val outputCurrent: Double?
@@ -81,7 +119,7 @@ class SparkWrapper(
                     alertLabel,
                     "not present (init: ${initError.name})",
                     Alerts.Level.ERROR,
-                )
+                ),
             )
         return runCatching { motor.healthAlerts(alertLabel) }
             .getOrElse {

@@ -3,7 +3,9 @@
 // the WPILib BSD license file in the root directory of this project.
 package frc.robot
 
+import edu.wpi.first.net.WebServer
 import edu.wpi.first.wpilibj.DriverStation
+import edu.wpi.first.wpilibj.Filesystem
 import edu.wpi.first.wpilibj.TimedRobot
 import edu.wpi.first.wpilibj2.command.Command
 import edu.wpi.first.wpilibj2.command.CommandScheduler
@@ -31,6 +33,12 @@ class Robot : TimedRobot() {
         // autonomous chooser on the dashboard.
         robotContainer = RobotContainer()
         //        CameraServer.startAutomaticCapture()
+        try {
+            WebServer.start(5800, Filesystem.getDeployDirectory().path)
+            println("Elastic Dashboard server started on port 5800")
+        } catch (e: Exception) {
+            println("Failed to start Elastic Dashboard web server: ${e.message}")
+        }
     }
 
     /**

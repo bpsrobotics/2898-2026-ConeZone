@@ -54,6 +54,7 @@ def includeDesktopSupport = false
 // Defining my dependencies. In this case, WPILib (+ friends), and vendor libraries.
 // Also defines JUnit 5.
 dependencies {
+    compileOnly 'org.jetbrains.kotlin:kotlin-compiler-embeddable:2.2.20'
     annotationProcessor wpi.java.deps.wpilibAnnotations()
     implementation wpi.java.deps.wpilib()
     implementation wpi.java.vendor.java()
@@ -74,6 +75,14 @@ dependencies {
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.1'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+configurations {
+    kotlinPsi
+}
+
+dependencies {
+    kotlinPsi 'org.jetbrains.kotlin:kotlin-compiler-embeddable:2.2.20'
 }
 
 test {
@@ -122,4 +131,16 @@ tasks.register('calibrateSwerveOffsets', JavaExec) {
     args((project.findProperty('robotHost') ?: '10.28.98.2').toString(),
         (project.findProperty('sampleSeconds') ?: '5').toString(),
         project.file('src/main/deploy/swerve1/modules').absolutePath)
+}
+
+tasks.register('saveElevatorGains', JavaExec) {
+    group = 'robot'
+    description = 'Read live elevator PID and feedforward gains from NetworkTables into Elevator.kt.'
+    dependsOn classes, extractReleaseNative
+    classpath = sourceSets.main.runtimeClasspath + configurations.kotlinPsi
+    mainClass = 'frc.robot.tools.SaveElevatorGainsKt'
+    systemProperty 'java.library.path', layout.buildDirectory.dir('jni/release').get().asFile.absolutePath
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
+    args((project.findProperty('robotHost') ?: '10.28.98.2').toString(),
+        project.file('src/main/kotlin').absolutePath)
 }

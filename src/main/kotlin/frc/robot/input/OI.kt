@@ -11,9 +11,12 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase
 import edu.wpi.first.wpilibj2.command.button.CommandJoystick
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController
 import edu.wpi.first.wpilibj2.command.button.Trigger
+import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine
 import frc.robot.commands.swerve.DriveManager
 import frc.robot.input.OI.process
+import frc.robot.subsystems.Arm
 import frc.robot.subsystems.Drivetrain
+import frc.robot.subsystems.Elevator
 import frc.robot.utils.asSeconds
 import frc.robot.utils.getAlliance
 import frc.robot.utils.sec
@@ -57,6 +60,26 @@ object OI : SubsystemBase() {
             "SysIdCommands/Drivetrain/AngleMotors",
             Drivetrain.sysIdAngleMotors(),
         )
+        for ((name, direction) in
+            listOf(
+                "Forward" to SysIdRoutine.Direction.kForward,
+                "Reverse" to SysIdRoutine.Direction.kReverse,
+            )) {
+            SmartDashboard.putData(
+                "SysIdCommands/Arm/Quasistatic$name",
+                Arm.sysIdQuasistatic(direction),
+            )
+            SmartDashboard.putData("SysIdCommands/Arm/Dynamic$name", Arm.sysIdDynamic(direction))
+            SmartDashboard.putData(
+                "SysIdCommands/Elevator/Quasistatic$name",
+                Elevator.sysIdQuasistatic(direction),
+            )
+            SmartDashboard.putData(
+                "SysIdCommands/Elevator/Dynamic$name",
+                Elevator.sysIdDynamic(direction),
+            )
+        }
+        SmartDashboard.putData("SysIdCommands/Elevator/AnalyzeGravity", Elevator.analyzeGravity())
     }
 
     /**
