@@ -2,7 +2,6 @@ plugins {
     id "java"
     id "edu.wpi.first.GradleRIO" version "2026.2.1"
     id 'org.jetbrains.kotlin.jvm' version '2.2.20'
-    id "org.jetbrains.kotlin.kapt" version '2.2.20'
 }
 
 java {
@@ -131,8 +130,8 @@ tasks.register('calibrateSwerveOffsets', JavaExec) {
     systemProperty 'java.library.path', layout.buildDirectory.dir('jni/release').get().asFile.absolutePath
     jvmArgs '--enable-native-access=ALL-UNNAMED'
     args((project.findProperty('robotHost') ?: '10.28.98.2').toString(),
-        (project.findProperty('sampleSeconds') ?: '5').toString(),
-        project.file('src/main/deploy/swerve1/modules').absolutePath)
+            (project.findProperty('sampleSeconds') ?: '5').toString(),
+            project.file('src/main/deploy/swerve1/modules').absolutePath)
 }
 
 tasks.register('saveElevatorGains', JavaExec) {
@@ -144,7 +143,7 @@ tasks.register('saveElevatorGains', JavaExec) {
     systemProperty 'java.library.path', layout.buildDirectory.dir('jni/release').get().asFile.absolutePath
     jvmArgs '--enable-native-access=ALL-UNNAMED'
     args((project.findProperty('robotHost') ?: '10.28.98.2').toString(),
-        project.file('src/main/kotlin').absolutePath)
+            project.file('src/main/kotlin').absolutePath)
 }
 repositories {
     mavenCentral()
